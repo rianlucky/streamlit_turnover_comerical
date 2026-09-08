@@ -51,9 +51,11 @@ def card_close(legend: Iterable[tuple[str, str, float]] = ()) -> None:
 
 
 def stat_pair(items: list[tuple[str, str, str]]) -> None:
-    """Small comparison cards reusing the .kpi look (for indicators outside the main 6 KPIs)."""
+    """Small comparison cards inside a chart-card (between card_open/card_close) — same
+    bordered .kpi look as the 6 main KPIs, but centered as a group instead of stretched
+    across a 6-column grid, since there are usually only 2 or 3 of them."""
     cards = "".join(f'<div class="kpi {css_class}"><div class="kv">{escape(value)}</div><div class="kl">{escape(label)}</div></div>' for css_class, value, label in items)
-    st.html(f'<div class="kpi-row" style="grid-template-columns:repeat({len(items)},1fr);max-width:640px;margin-bottom:14px">{cards}</div>')
+    st.html(f'<div class="kpi-row-centered">{cards}</div>')
 
 
 def _format_date(value: str) -> str:

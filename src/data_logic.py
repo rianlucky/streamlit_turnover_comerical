@@ -12,12 +12,22 @@ from typing import Any
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-HTML_SOURCE = PROJECT_ROOT / "assets" / "painel_cidade_CLT_media_turnover.html"
+ASSETS_DIR = PROJECT_ROOT / "assets"
 
-# Cidade -> UF. A base atual (assets/painel_cidade_CLT_media_turnover.html) não traz
-# o estado por colaborador, então este mapeamento é inferido manualmente a partir do
-# nome da cidade — vale conferir caso a empresa opere em uma cidade homônima de outro
-# estado. "Lotes" não é uma cidade (é um segmento de negócio) e fica sem UF.
+
+def _find_html_source() -> Path:
+    """Locate the local source HTML in assets/ — not versioned (contém dado real de
+    colaborador), então o nome do arquivo não fica hardcoded nem aparece no repositório."""
+    matches = sorted(ASSETS_DIR.glob("*.html"))
+    if not matches:
+        raise FileNotFoundError(f"Nenhum arquivo .html encontrado em {ASSETS_DIR} — ele não é versionado, precisa existir localmente.")
+    return matches[0]
+
+
+# Cidade -> UF. A base local não traz o estado por colaborador, então este mapeamento
+# é inferido manualmente a partir do nome da cidade — vale conferir caso a empresa
+# opere em uma cidade homônima de outro estado. "Lotes" não é uma cidade (é um
+# segmento de negócio) e fica sem UF.
 CITY_UF = {
     "Arapongas": "PR", "Araraquara": "SP", "Araçatuba": "SP", "Assis": "SP",
     "Assis Chateaubriand": "PR", "Avaré": "SP", "Barretos": "SP", "Bauru": "SP",
@@ -68,7 +78,7 @@ def _extract_json(source: str, declaration: str, next_declaration: str) -> Any:
 
 def load_source_data() -> dict[str, Any]:
     """Read the embedded row-level payload and derive every filter option from it."""
-    source = HTML_SOURCE.read_text(encoding="utf-8")
+    source = _find_html_source().read_text(encoding="utf-8")
     payload = _extract_json(source, "PAYLOAD", "ALL_ROWS")
     raw_rows = _extract_json(source, "ALL_ROWS", "CIDADES")
 
@@ -95,10 +105,14 @@ def _month_bounds(key: str) -> tuple[pd.Timestamp, pd.Timestamp]:
 
 def build_monthly_series(rows: pd.DataFrame, keys: list[str]) -> dict[str, list[float]]:
     """Compute headcount/admissions/terminations per month directly from row-level dates,
-    then derive turnover real e indicador legado com a mesma regra de negócio de sempre."""
+    then derive turnover real e indicador legado com a mesma regra de negócio de sempre.
+
+    Também calcula ``turn_do``: a variante do turnover real usada pelo D.O., que divide
+    pelo efetivo do último dia do mês anterior em vez da média entre início e fim do mês
+    (ver ``charts.comparativo_turnover`` / página "Comparativo Turnover")."""
     if rows.empty:
         zeros = [0] * len(keys)
-        return {"at": zeros, "adm": zeros, "dem": zeros, "turn": [0.0] * len(keys), "turn_dem_ant": [0.0] * len(keys)}
+        return {"at": zeros, "adm": zeros, "dem": zeros, "turn": [0.0] * len(keys), "turn_do": [0.0] * len(keys), "turn_dem_ant": [0.0] * len(keys)}
 
     admissao = pd.to_datetime(rows["Admissão"], errors="coerce")
     demissao = pd.to_datetime(rows["Demissão"].replace("", None), errors="coerce")
@@ -110,14 +124,15 @@ def build_monthly_series(rows: pd.DataFrame, keys: list[str]) -> dict[str, list[
         dem.append(int(((demissao >= start) & (demissao <= end)).sum()))
         at.append(int(((admissao <= end) & (demissao.isna() | (demissao > end))).sum()))
 
-    turn, turn_dem_ant, previous_at = [], [], None
+    turn, turn_do, turn_dem_ant, previous_at = [], [], [], None
     for current_at, admissions, terminations in zip(at, adm, dem):
         at_start = current_at if previous_at is None else previous_at
         average_headcount = (at_start + current_at) / 2
         turn.append(round((admissions + terminations) / 2 / average_headcount * 100, 2) if average_headcount else 0.0)
+        turn_do.append(round((admissions + terminations) / 2 / at_start * 100, 2) if at_start else 0.0)
         turn_dem_ant.append(round(terminations / at_start * 100, 2) if at_start else 0.0)
         previous_at = current_at
-    return {"at": at, "adm": adm, "dem": dem, "turn": turn, "turn_dem_ant": turn_dem_ant}
+    return {"at": at, "adm": adm, "dem": dem, "turn": turn, "turn_do": turn_do, "turn_dem_ant": turn_dem_ant}
 
 
 def filter_cidade_grupo(rows: pd.DataFrame, cidades: list[str], grupos: list[str]) -> pd.DataFrame:
@@ -147,7 +162,7 @@ def last_active_month(rows: pd.DataFrame) -> str:
 
 def select_period(source_data: dict[str, Any], series: dict[str, list[float]], start: str, end: str) -> pd.DataFrame:
     start_index, end_index = max(0, source_data["keys"].index(start)), min(len(source_data["keys"]) - 1, source_data["keys"].index(end))
-    return pd.DataFrame({"Mês": source_data["labels"][start_index:end_index + 1], "Chave": source_data["keys"][start_index:end_index + 1], "Ativos": series["at"][start_index:end_index + 1], "Admissões": series["adm"][start_index:end_index + 1], "Desligamentos": series["dem"][start_index:end_index + 1], "Turnover real (%)": series["turn"][start_index:end_index + 1], "Legado (%)": series["turn_dem_ant"][start_index:end_index + 1]})
+    return pd.DataFrame({"Mês": source_data["labels"][start_index:end_index + 1], "Chave": source_data["keys"][start_index:end_index + 1], "Ativos": series["at"][start_index:end_index + 1], "Admissões": series["adm"][start_index:end_index + 1], "Desligamentos": series["dem"][start_index:end_index + 1], "Turnover real (%)": series["turn"][start_index:end_index + 1], "Turnover D.O. (%)": series["turn_do"][start_index:end_index + 1], "Legado (%)": series["turn_dem_ant"][start_index:end_index + 1]})
 
 
 def filter_people(rows: pd.DataFrame, cidades: list[str], grupos: list[str], start: str, end: str, search: str, status_selected: list[str] | None = None) -> pd.DataFrame:
@@ -227,51 +242,3 @@ def humanize_days(total_days: float) -> str:
     if months > 0:
         return f"{months} {'mês' if months == 1 else 'meses'}"
     return f"{days} {'dia' if days == 1 else 'dias'}"
-
-
-def retention_curve(rows: pd.DataFrame, keys: list[str], labels: list[str], last_data_key: str) -> pd.DataFrame:
-    """Para cada mês de admissão (coorte), % da leva ainda ativa após 3/6/12 meses.
-
-    Um horizonte só é calculado quando já se passou tempo suficiente (o mês de checagem
-    precisa estar dentro do último mês com dados na base); caso contrário fica ausente
-    (NaN) em vez de ser tratado como 0%.
-    """
-    columns = ["Chave", "Mês", "Tamanho", "3m_pct", "3m_n", "6m_pct", "6m_n", "12m_pct", "12m_n"]
-    if rows.empty or last_data_key not in keys:
-        return pd.DataFrame(columns=columns)
-
-    admissao = pd.to_datetime(rows["Admissão"], errors="coerce")
-    demissao = pd.to_datetime(rows["Demissão"].replace("", None), errors="coerce")
-    _, last_end = _month_bounds(last_data_key)
-
-    records = []
-    for i, key in enumerate(keys):
-        start, end = _month_bounds(key)
-        cohort_mask = (admissao >= start) & (admissao <= end)
-        size = int(cohort_mask.sum())
-        if size == 0:
-            continue
-        cohort_dem = demissao[cohort_mask]
-        record: dict[str, Any] = {"Chave": key, "Mês": labels[i], "Tamanho": size}
-        for months_after, prefix in ((3, "3m"), (6, "6m"), (12, "12m")):
-            target_idx = i + months_after
-            if target_idx >= len(keys) or _month_bounds(keys[target_idx])[1] > last_end:
-                record[f"{prefix}_pct"] = None
-                record[f"{prefix}_n"] = None
-                continue
-            _, target_end = _month_bounds(keys[target_idx])
-            still_active = int((cohort_dem.isna() | (cohort_dem > target_end)).sum())
-            record[f"{prefix}_pct"] = round(still_active / size * 100, 1)
-            record[f"{prefix}_n"] = still_active
-        records.append(record)
-
-    return pd.DataFrame(records, columns=columns)
-
-
-def weighted_retention(df: pd.DataFrame, prefix: str) -> float | None:
-    """Média ponderada (pelo tamanho da coorte) da retenção em um horizonte, entre coortes elegíveis."""
-    valid = df.dropna(subset=[f"{prefix}_pct"])
-    total = valid["Tamanho"].sum()
-    if total == 0:
-        return None
-    return float(valid[f"{prefix}_n"].sum() / total * 100)

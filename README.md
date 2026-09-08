@@ -1,32 +1,36 @@
 # Turnover Comercial
 
-Dashboard Streamlit para análise de movimentação de pessoas da área comercial, recriando o visual e os gráficos do painel original em `assets/painel_cidade_CLT_media_turnover.html`.
+Dashboard Streamlit para análise de movimentação de pessoas da área comercial, recriando o visual e os gráficos de um painel HTML original.
 
 ## Estrutura de pastas
 
 ```
 Turnover Comercial/
-├── app.py                 # Ponto de entrada Streamlit (orquestração da página)
+├── app.py                  # Roteador: autenticação + st.navigation/st.Page (ponto de entrada)
 ├── requirements.txt
 ├── .streamlit/
-│   ├── config.toml         # Tema (cores, tipografia) alinhado à identidade visual original
+│   ├── config.toml          # Tema (cores, tipografia) alinhado à identidade visual original
 │   └── secrets.toml.example  # Modelo do secrets.toml real (não versionado) — connection string do Neon
 ├── assets/
-│   └── painel_cidade_CLT_media_turnover.html   # Painel HTML original — fonte dos dados da V1 (⚠️ NÃO versionado, ver abaixo)
+│   ├── icons/               # Ícone/logo do projeto (icone-turnover-comercial*.png/svg, logo_sidebar.png)
+│   └── *.html                # Painel HTML original — fonte dos dados da V1 (⚠️ NÃO versionado, ver abaixo)
 ├── scripts/
-│   └── grant_access.py     # CLI para conceder/remover acesso de um e-mail (sem senha)
+│   └── grant_access.py      # CLI para conceder/remover acesso de um e-mail (sem senha)
+├── app_pages/
+│   ├── dashboard.py          # Página principal (KPIs, gráficos, tabela) — conteúdo que antes estava em app.py
+│   └── comparativo_turnover.py  # Comparativo das fórmulas de turnover (Comercial × D.O.)
 └── src/
-    ├── data_logic.py       # Carga de dados e regras de negócio (turnover, headcount, filtros)
-    ├── charts.py           # Gráficos Plotly que replicam os gráficos Chart.js do HTML original
-    ├── components.py       # KPIs, cartões de gráfico e tabela analítica (HTML/CSS)
-    ├── styles.py           # Paleta de cores, fonte DM Sans e CSS injetado no app
-    ├── auth.py             # Login (hash bcrypt + Postgres/Neon)
+    ├── data_logic.py        # Carga de dados e regras de negócio (turnover, headcount, filtros)
+    ├── charts.py            # Gráficos Plotly que replicam os gráficos Chart.js do HTML original
+    ├── components.py        # KPIs, cartões de gráfico e tabela analítica (HTML/CSS)
+    ├── styles.py            # Paleta de cores, fonte DM Sans e CSS injetado no app
+    ├── auth.py              # Login (hash bcrypt + Postgres/Neon)
     └── auth_ui.py           # Telas de login (e-mail -> sem acesso / criar senha / senha)
 ```
 
 ## V1: dados locais
 
-A primeira versão lê, sem alterar os dados ou os cálculos, o payload embutido em `assets/painel_cidade_CLT_media_turnover.html`. A fonte está isolada em `src/data_logic.py`; a futura conexão com Databricks poderá substituir `load_source_data()` sem mexer nos cálculos ou na interface.
+A primeira versão lê, sem alterar os dados ou os cálculos, o payload embutido em um HTML local (`src/data_logic.py` localiza automaticamente o primeiro `.html` dentro de `assets/`, sem precisar saber o nome do arquivo). A fonte está isolada em `src/data_logic.py`; a futura conexão com Databricks poderá substituir `load_source_data()` sem mexer nos cálculos ou na interface.
 
 **⚠️ Esse arquivo tem dados reais de colaboradores (nome, cidade, datas de admissão/demissão) e não é versionado** (`.gitignore` exclui `assets/*.html`) — precisa existir localmente para o app rodar, mas nunca deve ir para o GitHub, ainda mais estando o repositório público. Enquanto a fonte de dados for esse arquivo local, **o app publicado no Streamlit Cloud não vai ter dado nenhum** (o Cloud só recebe o que está no repositório) — ver `Context.md` para o que falta decidir antes de publicar de verdade (mover a base para o mesmo Postgres usado no login, por exemplo).
 
@@ -57,6 +61,7 @@ python -m streamlit run app.py
 - **Status** (multiseleção Ativo/Desligado; vazio = ambos).
 - Busca por nome, cargo, cidade **ou ID**, ordenação por coluna e paginação de 20 em 20 na tabela de colaboradores.
 - KPIs, 5 visualizações (admissões × demissões, turnover real, headcount ativo, saldo líquido, indicador legado — as 4 últimas com rótulo do maior/menor valor) e tabela analítica com permanência humanizada ("2 anos e 3 meses", "5 meses", "18 dias"...).
-- Dois indicadores complementares: Permanência Média (Ativos × Desligados) e Curva de Retenção por Coorte de Admissão (3/6/12 meses).
+- Indicador complementar: Permanência Média (Ativos × Desligados).
+- Segunda página na barra lateral, **Comparativo Turnover**: compara a fórmula de turnover do Comercial (efetivo médio do mês) com a do D.O. (efetivo do fechamento do mês anterior), lado a lado, com recomendação de qual seguir como indicador oficial.
 
 O turnover real e o indicador legado seguem as fórmulas existentes no HTML original — ver `Context.md`, que também documenta as limitações atuais de dados (UF inferida manualmente; sem campo de gestor/executivo, previsto para quando entrar o Databricks).

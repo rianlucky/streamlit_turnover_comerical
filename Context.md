@@ -2,29 +2,31 @@
 
 ## Objetivo
 
-Recriar em Streamlit o dashboard de turnover comercial existente em `assets/painel_cidade_CLT_media_turnover.html`, mantendo os cálculos atuais, com fidelidade visual aos gráficos e componentes do painel original, e preparando a arquitetura para uma futura fonte Databricks.
+Recriar em Streamlit o dashboard de turnover comercial existente em um painel HTML local, mantendo os cálculos atuais, com fidelidade visual aos gráficos e componentes do painel original, e preparando a arquitetura para uma futura fonte Databricks.
 
 ## Estado atual
 
-- V4: código organizado em módulos (`src/data_logic.py`, `src/charts.py`, `src/components.py`, `src/styles.py`) e `app.py` como orquestrador enxuto.
+- V5: `app.py` é um roteador fino (autenticação + `st.navigation`/`st.Page`); o conteúdo antes nele agora vive em `app_pages/dashboard.py`. Segunda página, `app_pages/comparativo_turnover.py`, compara a fórmula de turnover do Comercial (efetivo médio) com a do D.O. (efetivo do fechamento do mês anterior), com uma recomendação de qual usar oficialmente.
+- Barra lateral: logo do projeto (`assets/icons/logo_sidebar.png`) no topo acima das abas, ícones Material Symbols por página, saudação "Olá, {nome}" + botão Sair abaixo da navegação.
+- Código organizado em módulos (`src/data_logic.py`, `src/charts.py`, `src/components.py`, `src/styles.py`, `src/auth.py`, `src/auth_ui.py`).
 - Dados lidos do payload JSON já presente no HTML original (sem conexão Databricks) — ver "Origem dos dados e limitações" abaixo.
 - Filtros: cidade (multiseleção, exibida como "Cidade/UF"), grupo de cargo (multiseleção com 7 grupos agregados), período (`De`/`Até`, dois `selectbox` digitáveis) e status (multiseleção "Ativo"/"Desligado", vazio = ambos).
 - Período padrão calculado dinamicamente: últimos 12 meses a partir do último mês com dado (`last_active_month`), não um valor fixo — hoje resulta em Ago/25→Jul/26.
 - KPIs (6 cartões), cinco visualizações (Plotly, recriando os gráficos Chart.js do HTML original, barras com cantos arredondados e rótulo do maior/menor valor em 4 delas) e tabela analítica de colaboradores com busca (nome, cargo, cidade **e ID**), ordenação e paginação (20 por página).
 - Permanência exibida de forma humanizada ("X anos e X meses" / "X anos" / "X meses" / "X dias"), com cor por faixa.
-- Dois indicadores complementares abaixo dos gráficos principais: Permanência Média (Ativos × Desligados) e Curva de Retenção por Coorte de Admissão (3/6/12 meses).
+- Um indicador complementar abaixo dos gráficos principais: Permanência Média (Ativos × Desligados).
 - Paleta de cores, tipografia (DM Sans) e estilo de cartões/badges/tabela replicados via CSS injetado (`src/styles.py`) e tema em `.streamlit/config.toml`.
 
 ## Login e infraestrutura (2026-09-08)
 
-- Repositório GitHub (`rianlucky/streamlit_turnover_comerical`) vai ficar **público** — a pedido do usuário. Antes disso, removi `assets/painel_cidade_CLT_media_turnover.html` (dado real de 596 colaboradores) do rastreamento do git **e reescrevi o único commit existente** (amend + `push --force-with-lease`) pra ele não aparecer nem no histórico. O arquivo continua no disco local — só não vai mais pro GitHub. Conferi o resto do código/docs em busca de nomes/dados reais vazados: nada além desse arquivo.
+- Repositório GitHub (`rianlucky/streamlit_turnover_comerical`) vai ficar **público** — a pedido do usuário. Antes disso, removi o HTML local com dado real de 596 colaboradores do rastreamento do git **e reescrevi o único commit existente** (amend + `push --force-with-lease`) pra ele não aparecer nem no histórico. O arquivo continua no disco local — só não vai mais pro GitHub. Conferi o resto do código/docs em busca de nomes/dados reais vazados: nada além desse arquivo. O caminho/nome do arquivo também não fica mais hardcoded em lugar nenhum do repositório (`data_logic._find_html_source()` acha qualquer `.html` dentro de `assets/`).
 - **Pendência crítica antes de publicar de verdade**: a única fonte de dados do app é esse arquivo local. Como o Streamlit Cloud só recebe o que está no repositório (agora sem o arquivo), **o app publicado vai ficar sem nenhum dado** assim que for deployado a partir do repo público. Precisa decidir onde a base de colaboradores vai morar antes do deploy — o candidato natural é o mesmo Postgres (Neon) que já está sendo usado para o login, migrando `load_source_data()` para consultar uma tabela em vez de ler o HTML. Ainda não implementado.
 - Login por e-mail implementado (`src/auth.py`, `src/auth_ui.py`), persistido no Neon: tela 1 pede e-mail; tela 2 mostra um de três casos (sem acesso -> pede pra solicitar a `rian.jesus@pacaembu.com`; acesso liberado sem senha ainda -> cria senha; acesso com senha -> loga). O DO concede acesso só inserindo o e-mail (`scripts/grant_access.py`), sem definir senha nenhuma — quem cria a senha é a própria pessoa, no primeiro login.
 - Considerado (e descartado por ora) usar Microsoft Entra ID (`st.login`) pra SSO corporativo — mais robusto, mas depende de um App registration no Azure AD que o TI ainda não tem disponível. Fica como possível evolução futura; a lógica de "logado ou não" está isolada em `auth_ui.require_login()`, então dá pra trocar sem reescrever o resto do app.
 
 ## Origem dos dados e limitações (V4)
 
-A única fonte de dados é `assets/painel_cidade_CLT_media_turnover.html` (payload `ALL_ROWS`), com estas colunas por colaborador: `Registro, Nome, Cargo Atual2, Grupo, Cidade, Admissão, Demissão, Status, Perm_meses`. **Não há campo de UF/Estado nem de gestor/gerente responsável.**
+A única fonte de dados é um HTML local em `assets/` (payload `ALL_ROWS`; ver `data_logic._find_html_source()` — qualquer `.html` ali dentro serve, o nome não importa), com estas colunas por colaborador: `Registro, Nome, Cargo Atual2, Grupo, Cidade, Admissão, Demissão, Status, Perm_meses`. **Não há campo de UF/Estado nem de gestor/gerente responsável.**
 
 - **UF da cidade**: como a base não traz o estado, `src/data_logic.py:CITY_UF` mapeia cada uma das 43 cidades para sua UF manualmente (conhecimento geográfico geral, não uma coluna da base). Convém alguém do time validar essa lista, em especial cidades menos conhecidas (`Bálsamo`, `Nova Marilândia`, `Piratininga`, `Rio Preto` etc.). "Lotes" não é uma cidade real (é um segmento/tipo de operação) e fica sem UF.
 - **Grupos de cargo**: a base atual só tem 7 valores em `Cargo Atual2` (`Analista de Parcerias`, `Analista de Vendas Junior`, `Assistente de Vendas`, `Auxiliar de Vendas`, `Coordenador Comercial`, `Gerente Comercial`, `Supervisor de Vendas`). O mapeamento pedido citava títulos adicionais (`Gerente de Vendas`, `Gerente de Lotes Comercial`, `Coordenador de Vendas`, `Analista de Suporte de Vendas`, `Analista de Lotes Comerciais`) que **não existem nesta base**; foram incluídos em `CARGO_GROUP_MAP` por precaução (caso apareçam em uma carga futura), mas hoje não têm efeito.
@@ -33,7 +35,6 @@ A única fonte de dados é `assets/painel_cidade_CLT_media_turnover.html` (paylo
 ## Indicadores complementares implementados
 
 - **Permanência Média: Ativos × Desligados** (`app.py`, chama `filter_people(..., status_selected=[])` para sempre comparar os dois grupos, independente do filtro de Status escolhido): tempo de casa médio dos dois grupos, no filtro de cidade/cargo/período atual.
-- **Curva de Retenção por Coorte de Admissão** (`data_logic.retention_curve`): para cada mês de admissão, % da leva ainda ativa após 3/6/12 meses; só calcula um horizonte quando já passou tempo suficiente (compara com `last_active_month`). Resumo com média ponderada pelo tamanho de cada coorte (`weighted_retention`) e gráfico com as últimas 18 coortes elegíveis. Usa cidade/cargo do filtro atual; não considera período nem status (é uma visão histórica por natureza).
 
 ## Outras sugestões de indicadores (ainda não implementadas)
 
@@ -41,6 +42,7 @@ A única fonte de dados é `assets/painel_cidade_CLT_media_turnover.html` (paylo
 - **Turnover por cidade/UF**: ranking de cidades (ou UFs) com maior turnover no período — identifica onde a rotatividade está concentrada.
 - **Attrition precoce**: % de desligados com permanência < 3 meses sobre o total de desligados no período — indicador clássico de qualidade de contratação/onboarding.
 - **Sazonalidade de desligamentos**: desligamentos por mês-calendário (Jan, Fev, …) agregando todos os anos, para ver se há meses historicamente mais críticos.
+- **Curva de retenção por coorte de admissão** (% ainda ativo após 3/6/12 meses): chegou a ser implementada e depois removida a pedido do usuário (2026-09-08) — ver Changelog 0.6/0.7.1/0.7.2. Fica registrada aqui como ideia caso queiram retomar.
 
 Não é possível (sem dado novo): turnover voluntário vs. involuntário (não há campo de motivo do desligamento).
 

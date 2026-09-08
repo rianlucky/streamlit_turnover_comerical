@@ -1,10 +1,28 @@
 # Changelog
 
+## [0.7.2] - 2026-09-08
+
+- Removida por completo a "Curva de Retenção por Coorte de Admissão" (a pedido do usuário — não só os 3 cartões da 0.7.1, o indicador inteiro: título, gráfico e legenda). Removidas as funções que só existiam para ela: `data_logic.retention_curve`, `data_logic.weighted_retention`, `charts.retention_curve`. "Permanência Média: Ativos × Desligados" continua no dashboard, sem alteração.
+
+## [0.7.1] - 2026-09-08
+
+- Removidos os 3 cartões de indicador (retenção aos 3/6/12 meses) de cima do gráfico "Curva de Retenção por Coorte de Admissão" — a pedido do usuário, ficou só título/subtítulo + gráfico + legenda. "Permanência Média: Ativos × Desligados" não foi alterado.
+
+## [0.7.0] - 2026-09-08
+
+- **Navegação multipágina**: migrado de script único para `st.navigation`/`st.Page`. `app.py` virou um roteador fino (autenticação + navegação); o conteúdo do dashboard foi para `app_pages/dashboard.py`. Cada página só roda depois do login, checado uma única vez no roteador (antes cada página precisava chamar `require_login()` por conta própria).
+- **Nova página "Comparativo Turnover"** (`app_pages/comparativo_turnover.py`), pedido da diretoria: compara lado a lado a fórmula de turnover do Comercial (efetivo médio do mês) com a do D.O. (efetivo do fechamento do mês anterior) — mesmo numerador, denominador diferente. Nova série `turn_do` em `data_logic.build_monthly_series`/`select_period`. Inclui um card amarelo de "Recomendação de Mercado" com a leitura de qual fórmula é mais alinhada à prática de RH (efetivo médio) e por quê.
+- Filtro Status movido do topo para a linha "Ordenar por/Direção", junto da tabela "Colaboradores no filtro".
+- Barra lateral: logo do projeto (ícone + "TurnOver Comercial", `assets/icons/logo_sidebar.png`, gerado a partir do ícone oficial em `assets/icons/`) no topo, acima das abas; ícones Material Symbols em cada aba (`:material/groups:`, `:material/balance:` — o Streamlit não tem suporte nativo a Lucide, Material Symbols é o mais próximo); saudação "Olá, {nome}" + botão Sair abaixo da navegação.
+- Visual dos indicadores "Permanência Média" e "Curva de Retenção" ajustado em duas iterações: primeiro viraram números soltos sem borda (pra não parecerem caixas flutuando), depois — a pedido do usuário — voltaram a ser cartões com borda iguais aos 6 KPIs do topo, só que centralizados como grupo (`.kpi-row-centered`) em vez de esticados numa grade de 6 colunas.
+- Removidas todas as menções ao nome específico do arquivo HTML de dados em código e documentação (ver 0.6.0) — `data_logic._find_html_source()` localiza qualquer `.html` em `assets/`.
+
 ## [0.6.0] - 2026-09-08
 
-- **Remoção crítica de dados sensíveis do histórico do git**: `assets/painel_cidade_CLT_media_turnover.html` (dado real de 596 colaboradores) foi retirado do rastreamento e do único commit existente foi reescrito (amend + `push --force-with-lease`) para não conter mais o arquivo — necessário porque o repositório vai virar público. O arquivo continua no disco local (o app precisa dele para rodar), só não vai mais para o GitHub. Adicionado `assets/*.html` ao `.gitignore`.
+- **Remoção crítica de dados sensíveis do histórico do git**: o HTML local com dado real de 596 colaboradores foi retirado do rastreamento e o único commit existente foi reescrito (amend + `push --force-with-lease`) para não conter mais o arquivo — necessário porque o repositório vai virar público. O arquivo continua no disco local (o app precisa dele para rodar), só não vai mais para o GitHub. Adicionado `assets/*.html` ao `.gitignore`.
 - Conferido o restante do código/documentação em busca de nomes/dados reais vazados — nada encontrado além do arquivo acima.
 - **Pendência a decidir**: como a fonte de dados hoje é só esse arquivo local, o app publicado no Streamlit Cloud (que só recebe o que está no GitHub) vai ficar sem dado nenhum assim que o repo for público. Precisa mover a base de colaboradores para algum lugar que o app deployado consiga ler sem ela estar no git (ex.: a mesma base Neon usada no login) antes de publicar de verdade.
+- Removida toda menção ao nome específico do arquivo HTML do código e da documentação (mesmo ele não estando mais no repositório, o nome não precisa aparecer em lugar nenhum). `src/data_logic.py` agora localiza automaticamente qualquer `.html` dentro de `assets/` (`_find_html_source()`), em vez de um caminho fixo.
 
 ## [0.5.0] - 2026-09-08
 
@@ -38,7 +56,7 @@
 - Busca da tabela agora também localiza por ID (Registro); coluna "Registro" renomeada para "ID".
 - Permanência agora é humanizada: "X anos e X meses" / "X anos" / "X meses" / "X dias" (`humanize_tenure` em `src/data_logic.py`), com a cor da faixa (vermelho/âmbar/verde) recalculada a partir do total de dias.
 - **Arquitetura**: `get_series`/`filter_people` deixaram de depender do payload agregado pré-calculado (`PAYLOAD.data`, por cidade×grupo antigo) e passaram a montar a série mensal (admissões, desligamentos, headcount) diretamente a partir da base de colaboradores (`ALL_ROWS`). Isso remove a dependência da tabela dinâmica fixa do HTML original e permite qualquer combinação de filtros (cidade, grupo de cargo, status) sem precisar reprocessar o HTML de origem.
-- **Limitação identificada**: a base atual (`assets/painel_cidade_CLT_media_turnover.html`) não tem um campo de gestor/gerente responsável por colaborador. Não foi possível implementar o filtro "Executivos" nem o "Ranking de Executivos por turnover" (itens do pedido do usuário) por falta dessa coluna. Ver `Context.md` para detalhes e o que falta para viabilizar.
+- **Limitação identificada**: a base local não tem um campo de gestor/gerente responsável por colaborador. Não foi possível implementar o filtro "Executivos" nem o "Ranking de Executivos por turnover" (itens do pedido do usuário) por falta dessa coluna. Ver `Context.md` para detalhes e o que falta para viabilizar.
 
 ## [0.2.1] - 2026-09-08
 

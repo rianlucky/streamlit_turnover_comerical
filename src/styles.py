@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-# Paleta idêntica às custom properties do painel original (assets/painel_cidade_CLT_media_turnover.html)
+# Paleta idêntica às custom properties do painel HTML original
 COLORS = {
     "white": "#ffffff",
     "off": "#f7f7f5",
@@ -76,6 +76,13 @@ label[data-testid="stWidgetLabel"] p {{
 .leg {{ display:flex; gap:14px; margin:6px 0 10px; flex-wrap:wrap; }}
 .leg-item {{ display:flex; align-items:center; gap:5px; font-size:11px; color:var(--mid); }}
 .leg-dot {{ width:10px; height:10px; border-radius:2px; display:inline-block; }}
+
+/* Números de apoio dentro de um chart-card: mesmos cartões .kpi do topo (com borda),
+   mas centralizados como grupo em vez de esticados em grid — para 2 ou 3 itens, não
+   fazem sentido preencher a largura toda como os 6 KPIs principais. */
+.kpi-row-centered {{ display:flex; justify-content:center; gap:16px; flex-wrap:wrap; margin:6px 0 18px; }}
+.kpi-row-centered .kpi {{ flex:0 1 auto; min-width:200px; }}
+.kpi-row-centered .kpi .kv {{ white-space:nowrap; }}
 
 /* ── Tabela analítica ── */
 .table-title {{ font-size:13px; font-weight:600; color:var(--ink); }}

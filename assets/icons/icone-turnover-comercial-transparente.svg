@@ -1,0 +1,18 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="lineShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#003244" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Fluid wave, brand-colored strokes in the same 25% / 15% / 60% proportion as the Pacaembu flag -->
+  <g filter="url(#lineShadow)" stroke-linecap="butt" stroke-linejoin="round" fill="none" stroke-width="36">
+    <path d="M 86.00,292.00 C 100.99,273.05 140.94,183.55 174.69,162.15" stroke="#064D66"/>
+    <path d="M 174.69,162.15 C 180.72,158.33 186.55,156.69 192.00,158.00 C 205.52,161.25 218.89,188.48 232.40,221.14" stroke="#FAB900"/>
+    <path d="M 232.40,221.14 C 254.85,275.47 277.64,344.83 302.00,344.00 C 341.00,342.67 405.33,182.33 426.00,150.00" stroke="#F02727"/>
+  </g>
+
+  <!-- Rounded end caps at the true start (navy) and true end (red) only -->
+  <circle cx="86.00" cy="292.00" r="18" fill="#064D66"/>
+  <circle cx="426.00" cy="150.00" r="18" fill="#F02727"/>
+</svg>

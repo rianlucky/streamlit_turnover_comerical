@@ -105,3 +105,18 @@ def render_logout_button() -> None:
         st.session_state["auth_user"] = None
         st.session_state["auth_email"] = None
         st.rerun()
+
+
+def render_sidebar_account() -> None:
+    """Saudação + botão Sair na barra lateral, logo abaixo da navegação entre páginas
+    (o nome do projeto já vai embutido na imagem de ``st.logo``, no topo da barra)."""
+    user = st.session_state.get("auth_user")
+    if not user:
+        return
+    with st.sidebar:
+        st.markdown(f"Olá, **{user.get('name') or user['email']}**")
+        if st.button("Sair", key="sidebar_logout_btn", width="stretch"):
+            st.session_state["auth_user"] = None
+            st.session_state["auth_email"] = None
+            st.rerun()
+        st.divider()

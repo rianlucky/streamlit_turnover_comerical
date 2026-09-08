@@ -1,8 +1,8 @@
 """Plotly figure builders that mirror the Chart.js visuals of the original panel.
 
-Each function reproduces, trace by trace, the chart configuration found in
-``assets/painel_cidade_CLT_media_turnover.html`` (colors, fills, dashed mean
-lines and bar styling), so the Streamlit dashboard reads as the same chart set.
+Each function reproduces, trace by trace, the chart configuration found in the
+original HTML panel (colors, fills, dashed mean lines and bar styling), so the
+Streamlit dashboard reads as the same chart set.
 """
 
 from __future__ import annotations
@@ -95,12 +95,12 @@ def turnover_legado(period: pd.DataFrame, media: float) -> go.Figure:
     return fig
 
 
-def retention_curve(retention: pd.DataFrame, window: int = 18) -> go.Figure:
-    """3 linhas (retenção após 3/6/12 meses) pelas últimas `window` coortes de admissão com dado."""
-    recent = retention.tail(window)
-    x = recent["Mês"].tolist()
+def comparativo_turnover(period: pd.DataFrame) -> go.Figure:
+    """Duas linhas: turnover real (fórmula do Comercial, efetivo médio do mês) vs. a
+    variante do D.O. (efetivo do último dia do mês anterior) — mesmo numerador."""
+    x = period["Mês"].tolist()
     fig = go.Figure()
-    for prefix, color, label in (("3m", "#2563eb", "3 meses"), ("6m", "#d97706", "6 meses"), ("12m", "#16a34a", "12 meses")):
-        fig.add_trace(go.Scatter(x=x, y=recent[f"{prefix}_pct"].tolist(), name=label, mode="lines+markers", line={"color": color, "width": 2.2}, marker={"size": 5, "color": color}, connectgaps=False))
-    fig.update_layout(**_base_layout("%"))
+    fig.add_trace(go.Scatter(x=x, y=period["Turnover real (%)"].tolist(), name="Comercial", mode="lines+markers", line={"color": "#d97706", "width": 2.5, "shape": "spline", "smoothing": 0.6}, marker={"size": 6, "color": "#d97706"}))
+    fig.add_trace(go.Scatter(x=x, y=period["Turnover D.O. (%)"].tolist(), name="D.O.", mode="lines+markers", line={"color": "#2563eb", "width": 2.5, "shape": "spline", "smoothing": 0.6}, marker={"size": 6, "color": "#2563eb"}))
+    fig.update_layout(**_base_layout("%", margin={"l": 6, "r": 6, "t": 6, "b": 22}))
     return fig

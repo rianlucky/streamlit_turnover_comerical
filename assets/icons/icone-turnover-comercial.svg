@@ -1,0 +1,29 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F4F6F7"/>
+    </linearGradient>
+    <filter id="tileShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#064D66" flood-opacity="0.18"/>
+    </filter>
+    <filter id="lineShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#003244" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+
+  <!-- App-icon style rounded tile (larger radius = more rounded) -->
+  <rect x="16" y="16" width="480" height="480" rx="140" ry="140" fill="url(#bg)" filter="url(#tileShadow)"/>
+  <rect x="16" y="16" width="480" height="480" rx="140" ry="140" fill="none" stroke="#064D66" stroke-opacity="0.06" stroke-width="2"/>
+
+  <!-- Fluid wave, brand-colored strokes in the same 25% / 15% / 60% proportion as the Pacaembu flag -->
+  <g filter="url(#lineShadow)" stroke-linecap="butt" stroke-linejoin="round" fill="none" stroke-width="36">
+    <path d="M 86.00,292.00 C 100.99,273.05 140.94,183.55 174.69,162.15" stroke="#064D66"/>
+    <path d="M 174.69,162.15 C 180.72,158.33 186.55,156.69 192.00,158.00 C 205.52,161.25 218.89,188.48 232.40,221.14" stroke="#FAB900"/>
+    <path d="M 232.40,221.14 C 254.85,275.47 277.64,344.83 302.00,344.00 C 341.00,342.67 405.33,182.33 426.00,150.00" stroke="#F02727"/>
+  </g>
+
+  <!-- Rounded end caps at the true start (navy) and true end (red) only -->
+  <circle cx="86.00" cy="292.00" r="18" fill="#064D66"/>
+  <circle cx="426.00" cy="150.00" r="18" fill="#F02727"/>
+</svg>
