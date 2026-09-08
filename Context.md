@@ -15,6 +15,13 @@ Recriar em Streamlit o dashboard de turnover comercial existente em `assets/pain
 - Dois indicadores complementares abaixo dos gráficos principais: Permanência Média (Ativos × Desligados) e Curva de Retenção por Coorte de Admissão (3/6/12 meses).
 - Paleta de cores, tipografia (DM Sans) e estilo de cartões/badges/tabela replicados via CSS injetado (`src/styles.py`) e tema em `.streamlit/config.toml`.
 
+## Login e infraestrutura (2026-09-08)
+
+- Repositório GitHub (`rianlucky/streamlit_turnover_comerical`) vai ficar **público** — a pedido do usuário. Antes disso, removi `assets/painel_cidade_CLT_media_turnover.html` (dado real de 596 colaboradores) do rastreamento do git **e reescrevi o único commit existente** (amend + `push --force-with-lease`) pra ele não aparecer nem no histórico. O arquivo continua no disco local — só não vai mais pro GitHub. Conferi o resto do código/docs em busca de nomes/dados reais vazados: nada além desse arquivo.
+- **Pendência crítica antes de publicar de verdade**: a única fonte de dados do app é esse arquivo local. Como o Streamlit Cloud só recebe o que está no repositório (agora sem o arquivo), **o app publicado vai ficar sem nenhum dado** assim que for deployado a partir do repo público. Precisa decidir onde a base de colaboradores vai morar antes do deploy — o candidato natural é o mesmo Postgres (Neon) que já está sendo usado para o login, migrando `load_source_data()` para consultar uma tabela em vez de ler o HTML. Ainda não implementado.
+- Login por e-mail implementado (`src/auth.py`, `src/auth_ui.py`), persistido no Neon: tela 1 pede e-mail; tela 2 mostra um de três casos (sem acesso -> pede pra solicitar a `rian.jesus@pacaembu.com`; acesso liberado sem senha ainda -> cria senha; acesso com senha -> loga). O DO concede acesso só inserindo o e-mail (`scripts/grant_access.py`), sem definir senha nenhuma — quem cria a senha é a própria pessoa, no primeiro login.
+- Considerado (e descartado por ora) usar Microsoft Entra ID (`st.login`) pra SSO corporativo — mais robusto, mas depende de um App registration no Azure AD que o TI ainda não tem disponível. Fica como possível evolução futura; a lógica de "logado ou não" está isolada em `auth_ui.require_login()`, então dá pra trocar sem reescrever o resto do app.
+
 ## Origem dos dados e limitações (V4)
 
 A única fonte de dados é `assets/painel_cidade_CLT_media_turnover.html` (payload `ALL_ROWS`), com estas colunas por colaborador: `Registro, Nome, Cargo Atual2, Grupo, Cidade, Admissão, Demissão, Status, Perm_meses`. **Não há campo de UF/Estado nem de gestor/gerente responsável.**

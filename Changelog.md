@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.6.0] - 2026-09-08
+
+- **Remoção crítica de dados sensíveis do histórico do git**: `assets/painel_cidade_CLT_media_turnover.html` (dado real de 596 colaboradores) foi retirado do rastreamento e do único commit existente foi reescrito (amend + `push --force-with-lease`) para não conter mais o arquivo — necessário porque o repositório vai virar público. O arquivo continua no disco local (o app precisa dele para rodar), só não vai mais para o GitHub. Adicionado `assets/*.html` ao `.gitignore`.
+- Conferido o restante do código/documentação em busca de nomes/dados reais vazados — nada encontrado além do arquivo acima.
+- **Pendência a decidir**: como a fonte de dados hoje é só esse arquivo local, o app publicado no Streamlit Cloud (que só recebe o que está no GitHub) vai ficar sem dado nenhum assim que o repo for público. Precisa mover a base de colaboradores para algum lugar que o app deployado consiga ler sem ela estar no git (ex.: a mesma base Neon usada no login) antes de publicar de verdade.
+
+## [0.5.0] - 2026-09-08
+
+- Adicionado login por e-mail (`src/auth.py`, `src/auth_ui.py`): tela 1 pede o e-mail; tela 2 mostra um de três casos — (a) sem acesso cadastrado → orienta a solicitar inclusão a `rian.jesus@pacaembu.com`; (b) acesso cadastrado e primeiro login → pede para criar e confirmar uma senha; (c) acesso cadastrado e senha já definida → pede a senha.
+- O DO concede acesso só inserindo o e-mail (sem senha) — cada pessoa define a própria senha no primeiro login.
+- Credenciais persistidas em Postgres (Neon), via `st.connection("sql")` — necessário porque o sistema de arquivos do Streamlit Community Cloud é efêmero (some em reboot/redeploy), então não dá pra guardar senha em arquivo local.
+- Senhas com hash `bcrypt` (nunca armazenadas em texto puro).
+- `scripts/grant_access.py`: script de linha de comando para conceder (ou remover) acesso por e-mail, rodado localmente contra o Neon.
+- `.streamlit/secrets.toml.example` adicionado (modelo seguro pra versionar); `.streamlit/secrets.toml` real continua fora do git.
+- Botão "Sair" no cabeçalho do dashboard.
+- `requirements.txt`: adicionados `sqlalchemy`, `psycopg2-binary`, `bcrypt`.
+
 ## [0.4.0] - 2026-09-08
 
 - Filtro Status trocado de `radio` para `multiselect` (lista, mesmo padrão de Cidade/Cargo); opções `Ativo`/`Desligado`, vazio = Ambos.

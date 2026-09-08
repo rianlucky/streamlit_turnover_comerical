@@ -3,6 +3,8 @@ from __future__ import annotations
 import streamlit as st
 
 from src import charts
+from src.auth import init_db
+from src.auth_ui import render_logout_button, require_login
 from src.components import card_close, card_open, chart_card, kpi_row, render_table, stat_pair
 from src.data_logic import (
     city_label,
@@ -22,6 +24,9 @@ from src.styles import inject_css
 
 st.set_page_config(page_title="Turnover Comercial", page_icon=":material/insights:", layout="wide")
 inject_css()
+
+init_db()
+require_login()
 
 PAGE_SIZE = 20
 SORT_COLUMNS = {
@@ -53,7 +58,12 @@ if last_key not in source_data["keys"]:
 default_end_idx = source_data["keys"].index(last_key)
 default_start_idx = max(0, default_end_idx - 11)
 
-st.html('<div class="page-title"><h1>Movimentação de Pessoas</h1><p>Análise de admissões, demissões, turnover e headcount por cidade e cargo</p></div>')
+header_title, header_logout = st.columns([6, 1])
+with header_title:
+    st.html('<div class="page-title"><h1>Movimentação de Pessoas</h1><p>Análise de admissões, demissões, turnover e headcount por cidade e cargo</p></div>')
+with header_logout:
+    st.write("")
+    render_logout_button()
 
 with st.container(border=True):
     filters = st.columns([1.3, 1.5, 2.0, 1.3])
