@@ -82,6 +82,16 @@ def replace_people_rows(df: pd.DataFrame) -> int:
             df[col] = None
     df = df[list(COLUMN_MAP)].rename(columns=COLUMN_MAP)
 
+    # `registro` é PRIMARY KEY, mas a origem pode trazer o mesmo registro mais de uma
+    # vez (ex.: histórico de múltiplos vínculos na fato_funcionario_inativo, ou um JOIN
+    # que multiplicou a linha) — mantém a primeira ocorrência e avisa, em vez de quebrar
+    # o carregamento inteiro por causa de uma duplicata.
+    before = len(df)
+    df = df.drop_duplicates(subset="registro", keep="first")
+    duplicated = before - len(df)
+    if duplicated:
+        print(f"Aviso: {duplicated} registro(s) duplicado(s) na origem — mantida só a primeira ocorrência de cada.")
+
     # O Databricks devolve admissao/demissao como datetime.date; o HTML/CSV já manda
     # string. Normaliza os dois pra texto ISO antes de gravar na coluna TEXT.
     for col in ("admissao", "demissao"):
