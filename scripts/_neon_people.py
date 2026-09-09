@@ -81,13 +81,25 @@ def replace_people_rows(df: pd.DataFrame) -> int:
         if col not in df.columns:
             df[col] = None
     df = df[list(COLUMN_MAP)].rename(columns=COLUMN_MAP)
+
+    # O Databricks devolve admissao/demissao como datetime.date; o HTML/CSV já manda
+    # string. Normaliza os dois pra texto ISO antes de gravar na coluna TEXT.
+    for col in ("admissao", "demissao"):
+        df[col] = df[col].apply(lambda v: v.isoformat() if hasattr(v, "isoformat") else v)
     df["demissao"] = df["demissao"].fillna("")
+    # cidade/nome/cargo_atual2/status são NOT NULL na tabela; evita erro de integridade
+    # quando a origem não tem correspondência (ex.: join de cidade sem match).
+    for col in ("cidade", "nome", "cargo_atual2", "status"):
+        df[col] = df[col].fillna("")
 
     eng = engine()
+    # TRUNCATE + insert na MESMA transação: se o insert falhar por qualquer motivo
+    # (tipo de dado, chave duplicada, NOT NULL), o TRUNCATE também é desfeito — nunca
+    # fica uma tabela vazia no meio do caminho.
     with eng.begin() as conn:
         conn.execute(text(CREATE_TABLE_SQL))
         for stmt in ALTER_TABLE_SQL:
             conn.execute(text(stmt))
         conn.execute(text("TRUNCATE TABLE people_rows"))
-    df.to_sql("people_rows", eng, if_exists="append", index=False, method="multi", chunksize=200)
+        df.to_sql("people_rows", conn, if_exists="append", index=False, method="multi", chunksize=200)
     return len(df)
