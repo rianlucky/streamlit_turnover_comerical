@@ -52,21 +52,45 @@ def city_label(cidade: str) -> str:
     return f"{cidade}/{uf}" if uf else cidade
 
 
-# Cargo Atual2 (título de RH) -> grupo de filtro solicitado. Cobre os títulos observados
-# na base atual e variações citadas para cobrir futuras cargas de dados.
+# A base tem os mesmos cargos em variações de senioridade (Junior/Pleno/Sênior) — o
+# dash não distingue nível, então agrupa todas sob o cargo "base" antes de comparar
+# com CARGO_GROUP_MAP. Cobre também grafias sem acento vistas na base (ex.: "Senior").
+_SENIORITY_SUFFIXES = (" Júnior", " Junior", " Pleno", " Sênior", " Senior")
+
+# Typos/inconsistência de plural observados na base para o mesmo cargo.
+_CARGO_ALIASES = {
+    "Gerente de Lotes Comerciais": "Gerente de Lotes Comercial",
+}
+
+
+def _normalize_cargo(cargo: str) -> str:
+    for suffix in _SENIORITY_SUFFIXES:
+        if cargo.endswith(suffix):
+            cargo = cargo[: -len(suffix)]
+            break
+    return _CARGO_ALIASES.get(cargo, cargo)
+
+
+# Cargo (já normalizado por _normalize_cargo) -> grupo de filtro. Única lista de
+# cargos que o dash usa — qualquer título fora daqui é descartado em
+# load_source_data() (a query do Databricks é ampla o suficiente pra trazer gente
+# de outras áreas, ex.: Marketing, Financeiro Comercial, RH).
 CARGO_GROUP_MAP = {
     "Gerente de Vendas": "Gerente",
     "Gerente de Lotes Comercial": "Gerente",
-    "Gerente Comercial": "Gerente",
+    "Gerente de Repasses": "Gerente",
     "Coordenador de Vendas": "Coordenador",
-    "Coordenador Comercial": "Coordenador",
+    "Coordenador de Repasses": "Coordenador",
     "Supervisor de Vendas": "Supervisor",
     "Analista de Parcerias": "Analistas Parcerias",
     "Analista de Suporte de Vendas": "Analistas",
-    "Analista de Vendas Junior": "Analistas",
+    "Analista de Vendas": "Analistas",
     "Analista de Lotes Comerciais": "Analistas",
+    "Analista de Repasses": "Analistas",
     "Assistente de Vendas": "Assistentes",
+    "Assistente de Repasses": "Assistentes",
     "Auxiliar de Vendas": "Auxiliar",
+    "Auxiliar de Repasses": "Auxiliar",
 }
 CARGO_GROUP_ORDER = ["Auxiliar", "Assistentes", "Analistas", "Analistas Parcerias", "Supervisor", "Coordenador", "Gerente"]
 
@@ -111,7 +135,9 @@ def load_source_data() -> dict[str, Any]:
     (a partir do HTML local ou de um export do Databricks — ver README)."""
     conn = st.connection("sql")
     rows = conn.query(PEOPLE_ROWS_QUERY, ttl=600)
-    rows["Grupo"] = rows["Cargo Atual2"].map(CARGO_GROUP_MAP).fillna(rows["Cargo Atual2"])
+    rows["Cargo Atual2"] = rows["Cargo Atual2"].map(_normalize_cargo)
+    rows = rows[rows["Cargo Atual2"].isin(CARGO_GROUP_MAP)].copy()
+    rows["Grupo"] = rows["Cargo Atual2"].map(CARGO_GROUP_MAP)
 
     cidades = sorted(rows["Cidade"].unique())
     grupos_presentes = set(rows["Grupo"])
