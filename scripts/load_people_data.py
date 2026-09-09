@@ -27,7 +27,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.data_logic import _extract_json, _find_html_source  # noqa: E402
 
-from _neon_people import SECRETS_PATH, replace_people_rows  # noqa: E402
+from _neon_people import SECRETS_PATH, EmptySourceError, replace_people_rows  # noqa: E402
 
 
 def _load_from_html() -> pd.DataFrame:
@@ -58,8 +58,12 @@ def main() -> None:
         print(f"Colunas faltando na origem: {sorted(missing)}")
         sys.exit(1)
 
-    total = replace_people_rows(df)
     fonte = "CSV (Databricks)" if args.csv else "HTML local"
+    try:
+        total = replace_people_rows(df)
+    except EmptySourceError as exc:
+        print(f"ABORTADO: {exc}")
+        sys.exit(1)
     print(f"Carregados {total} registros em people_rows (fonte: {fonte}).")
 
 

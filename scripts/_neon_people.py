@@ -64,9 +64,18 @@ def engine() -> sqlalchemy.Engine:
     return sqlalchemy.create_engine(load_secrets()["connections"]["sql"]["url"])
 
 
+class EmptySourceError(RuntimeError):
+    """A origem (HTML/CSV/Databricks) voltou sem nenhuma linha — recusa substituir
+    a base boa que já está no Neon por uma tabela vazia."""
+
+
 def replace_people_rows(df: pd.DataFrame) -> int:
     """TRUNCATE + insert completo — a tabela sempre reflete só o último df carregado,
     nunca é incremental. Retorna o número de linhas gravadas."""
+    if df.empty:
+        raise EmptySourceError(
+            "A origem voltou com 0 linhas — nada foi gravado no Neon (people_rows continua como estava)."
+        )
     df = df.copy()
     for col in COLUMN_MAP:
         if col not in df.columns:

@@ -23,7 +23,7 @@ import pandas as pd
 from databricks import sql
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from _neon_people import SECRETS_PATH, load_secrets, replace_people_rows  # noqa: E402
+from _neon_people import SECRETS_PATH, EmptySourceError, load_secrets, replace_people_rows  # noqa: E402
 
 
 def _query(ref_str: str, gestor_referencia: str) -> str:
@@ -142,11 +142,17 @@ def main() -> None:
         sys.exit(1)
 
     df = fetch_from_databricks()
+    print(f"Query retornou {len(df)} linha(s) do Databricks.")
     df = df.rename(columns={"Cargo Atual": "Cargo Atual2", "Admissao": "Admissão", "Demissao": "Demissão"})
 
-    n_ativos = int((df["Status"] == "Ativo").sum())
-    n_desligados = int((df["Status"] == "Desligado").sum())
-    total = replace_people_rows(df)
+    n_ativos = int((df["Status"] == "Ativo").sum()) if not df.empty else 0
+    n_desligados = int((df["Status"] == "Desligado").sum()) if not df.empty else 0
+    try:
+        total = replace_people_rows(df)
+    except EmptySourceError as exc:
+        print(f"ABORTADO: {exc}")
+        print("Confira a query/permissões no Databricks antes de rodar de novo — people_rows não foi tocada.")
+        sys.exit(1)
     print(f"Carregados {total} registros em people_rows (fonte: Databricks). Ativos: {n_ativos} | Desligados: {n_desligados}")
 
 

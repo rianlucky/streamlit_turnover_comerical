@@ -30,7 +30,7 @@ SORT_COLUMNS = {
 STATUS_VALUES = ["Ativo", "Desligado"]
 
 
-@st.cache_data
+@st.cache_data(ttl=600)
 def get_data():
     return load_source_data()
 
