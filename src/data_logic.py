@@ -154,6 +154,17 @@ def load_source_data() -> dict[str, Any]:
     rows = rows[rows["Cargo Atual2"].isin(CARGO_GROUP_MAP)].copy()
     rows["Grupo"] = rows["Cargo Atual2"].map(CARGO_GROUP_MAP)
 
+    # Gambiarra pedida pelo usuário (2026-09-09): Lotes Comerciais e Repasses são
+    # segmentos de negócio, não times ligados a uma cidade específica — a cidade real
+    # do colaborador (via dim_local) não faz sentido pro filtro aqui, então vira o
+    # próprio segmento (mesmo padrão de "Lotes" já usado na base antiga em CITY_UF).
+    rows.loc[rows["Cargo Atual2"].str.contains("Lotes"), "Cidade"] = "Lotes"
+    rows.loc[rows["Cargo Atual2"].str.contains("Repasses"), "Cidade"] = "Repasses"
+    # A base antiga (HTML) já marcava estes 2 Registros como "Lotes" mesmo com cargo/
+    # cidade formal de Vendas — mantém a mesma classificação na base real (Databricks).
+    LOTES_REGISTRO_OVERRIDE = {2649, 2505}
+    rows.loc[rows["Registro"].isin(LOTES_REGISTRO_OVERRIDE), "Cidade"] = "Lotes"
+
     cidades = sorted(rows["Cidade"].unique())
     grupos_presentes = set(rows["Grupo"])
     grupos = [g for g in CARGO_GROUP_ORDER if g in grupos_presentes] + sorted(grupos_presentes - set(CARGO_GROUP_ORDER))
