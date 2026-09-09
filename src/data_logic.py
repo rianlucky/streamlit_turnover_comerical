@@ -57,9 +57,12 @@ def city_label(cidade: str) -> str:
 # com CARGO_GROUP_MAP. Cobre também grafias sem acento vistas na base (ex.: "Senior").
 _SENIORITY_SUFFIXES = (" Júnior", " Junior", " Pleno", " Sênior", " Senior")
 
-# Typos/inconsistência de plural observados na base para o mesmo cargo.
+# Typos/plural inconsistente ou nomes alternativos para o mesmo cargo, confirmados
+# pelo usuário (2026-09-09) como sendo o mesmo papel.
 _CARGO_ALIASES = {
     "Gerente de Lotes Comerciais": "Gerente de Lotes Comercial",
+    "Gerente Comercial": "Gerente de Vendas",
+    "Coordenador Comercial": "Coordenador de Vendas",
 }
 
 
@@ -76,23 +79,26 @@ def _normalize_cargo(cargo: str) -> str:
 # load_source_data() (a query do Databricks é ampla o suficiente pra trazer gente
 # de outras áreas, ex.: Marketing, Financeiro Comercial, RH).
 CARGO_GROUP_MAP = {
+    "Executivo Comercial": "Executivos",
     "Gerente de Vendas": "Gerente",
     "Gerente de Lotes Comercial": "Gerente",
     "Gerente de Repasses": "Gerente",
     "Coordenador de Vendas": "Coordenador",
     "Coordenador de Repasses": "Coordenador",
     "Supervisor de Vendas": "Supervisor",
+    "Supervisor de Repasses": "Supervisor",
     "Analista de Parcerias": "Analistas Parcerias",
     "Analista de Suporte de Vendas": "Analistas",
     "Analista de Vendas": "Analistas",
     "Analista de Lotes Comerciais": "Analistas",
     "Analista de Repasses": "Analistas",
+    "Analista de Treinamento": "Analistas",
     "Assistente de Vendas": "Assistentes",
     "Assistente de Repasses": "Assistentes",
     "Auxiliar de Vendas": "Auxiliar",
     "Auxiliar de Repasses": "Auxiliar",
 }
-CARGO_GROUP_ORDER = ["Auxiliar", "Assistentes", "Analistas", "Analistas Parcerias", "Supervisor", "Coordenador", "Gerente"]
+CARGO_GROUP_ORDER = ["Auxiliar", "Assistentes", "Analistas", "Analistas Parcerias", "Supervisor", "Coordenador", "Gerente", "Executivos"]
 
 
 def _extract_json(source: str, declaration: str, next_declaration: str) -> Any:
