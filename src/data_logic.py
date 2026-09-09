@@ -88,7 +88,8 @@ SELECT
     admissao AS "Admissão",
     demissao AS "Demissão",
     status AS "Status",
-    perm_meses AS "Perm_meses"
+    perm_meses AS "Perm_meses",
+    gestor AS "Gestor"
 FROM people_rows
 """
 
@@ -115,6 +116,7 @@ def load_source_data() -> dict[str, Any]:
     cidades = sorted(rows["Cidade"].unique())
     grupos_presentes = set(rows["Grupo"])
     grupos = [g for g in CARGO_GROUP_ORDER if g in grupos_presentes] + sorted(grupos_presentes - set(CARGO_GROUP_ORDER))
+    gestores = sorted(g for g in rows["Gestor"].dropna().unique() if g)
 
     keys, labels = _month_range()
 
@@ -122,6 +124,7 @@ def load_source_data() -> dict[str, Any]:
         "rows": rows,
         "cidades": cidades,
         "grupos": grupos,
+        "gestores": gestores,
         "labels": labels,
         "keys": keys,
     }
@@ -130,6 +133,13 @@ def load_source_data() -> dict[str, Any]:
 def _month_bounds(key: str) -> tuple[pd.Timestamp, pd.Timestamp]:
     period = pd.Period(key, freq="M")
     return period.start_time, period.end_time
+
+
+def month_start_end(key: str) -> tuple[date, date]:
+    """Como `_month_bounds`, mas em `date` puro — usado pelo `st.date_input` do filtro
+    de período (que precisa de `date`, não `Timestamp`)."""
+    start, end = _month_bounds(key)
+    return start.date(), end.date()
 
 
 def build_monthly_series(rows: pd.DataFrame, keys: list[str]) -> dict[str, list[float]]:
@@ -164,18 +174,20 @@ def build_monthly_series(rows: pd.DataFrame, keys: list[str]) -> dict[str, list[
     return {"at": at, "adm": adm, "dem": dem, "turn": turn, "turn_do": turn_do, "turn_dem_ant": turn_dem_ant}
 
 
-def filter_cidade_grupo(rows: pd.DataFrame, cidades: list[str], grupos: list[str]) -> pd.DataFrame:
-    """Only the Cidade/Grupo filters (empty lists = every city/grupo) — shared by charts, table and indicators."""
+def filter_cidade_grupo(rows: pd.DataFrame, cidades: list[str], grupos: list[str], gestores: list[str]) -> pd.DataFrame:
+    """Only the Cidade/Grupo/Gestor filters (empty lists = every city/grupo/gestor) — shared by charts, table and indicators."""
     if cidades:
         rows = rows[rows["Cidade"].isin(cidades)]
     if grupos:
         rows = rows[rows["Grupo"].isin(grupos)]
+    if gestores:
+        rows = rows[rows["Gestor"].isin(gestores)]
     return rows
 
 
-def get_series(source_data: dict[str, Any], cidades: list[str], grupos: list[str]) -> dict[str, list[float]]:
-    """Monthly series for the selected filters (empty lists = every city/grupo)."""
-    filtered = filter_cidade_grupo(source_data["rows"], cidades, grupos)
+def get_series(source_data: dict[str, Any], cidades: list[str], grupos: list[str], gestores: list[str]) -> dict[str, list[float]]:
+    """Monthly series for the selected filters (empty lists = every city/grupo/gestor)."""
+    filtered = filter_cidade_grupo(source_data["rows"], cidades, grupos, gestores)
     return build_monthly_series(filtered, source_data["keys"])
 
 
@@ -194,8 +206,8 @@ def select_period(source_data: dict[str, Any], series: dict[str, list[float]], s
     return pd.DataFrame({"Mês": source_data["labels"][start_index:end_index + 1], "Chave": source_data["keys"][start_index:end_index + 1], "Ativos": series["at"][start_index:end_index + 1], "Admissões": series["adm"][start_index:end_index + 1], "Desligamentos": series["dem"][start_index:end_index + 1], "Turnover real (%)": series["turn"][start_index:end_index + 1], "Turnover D.O. (%)": series["turn_do"][start_index:end_index + 1], "Legado (%)": series["turn_dem_ant"][start_index:end_index + 1]})
 
 
-def filter_people(rows: pd.DataFrame, cidades: list[str], grupos: list[str], start: str, end: str, search: str, status_selected: list[str] | None = None) -> pd.DataFrame:
-    filtered = filter_cidade_grupo(rows, cidades, grupos)
+def filter_people(rows: pd.DataFrame, cidades: list[str], grupos: list[str], gestores: list[str], start: str, end: str, search: str, status_selected: list[str] | None = None) -> pd.DataFrame:
+    filtered = filter_cidade_grupo(rows, cidades, grupos, gestores)
     admissions = filtered["Admissão"].fillna("")
     terminations = filtered["Demissão"].replace("", "2099-12-31").fillna("2099-12-31")
     filtered = filtered[(admissions <= f"{end}-31") & (terminations >= f"{start}-01")]

@@ -13,6 +13,7 @@ from src.data_logic import (
     last_active_month,
     load_source_data,
     mean_nonzero,
+    month_start_end,
     select_period,
 )
 
@@ -46,26 +47,41 @@ if last_key not in source_data["keys"]:
 default_end_idx = source_data["keys"].index(last_key)
 default_start_idx = max(0, default_end_idx - 11)
 
+min_date, _ = month_start_end(source_data["keys"][0])
+_, max_date = month_start_end(source_data["keys"][-1])
+default_start_date, _ = month_start_end(source_data["keys"][default_start_idx])
+_, default_end_date = month_start_end(last_key)
+
 st.html('<div class="page-title"><h1>Movimentação de Pessoas</h1><p>Análise de admissões, demissões, turnover e headcount por cidade e cargo</p></div>')
 
 with st.container(border=True):
-    filters = st.columns([1.5, 1.7, 2.2])
+    filters = st.columns([1.3, 1.5, 1.5, 2.0])
     with filters[0]:
         cidades = st.multiselect("Cidade", source_data["cidades"], placeholder="Global (todas)", format_func=city_label)
     with filters[1]:
         grupos = st.multiselect("Cargo", source_data["grupos"], placeholder="Todos")
     with filters[2]:
-        period_cols = st.columns(2)
-        with period_cols[0]:
-            start = st.selectbox("De", source_data["keys"], index=default_start_idx, format_func=lambda key: label_by_key[key])
-        with period_cols[1]:
-            end = st.selectbox("Até", source_data["keys"], index=default_end_idx, format_func=lambda key: label_by_key[key])
+        gestores = st.multiselect("Gestor", source_data["gestores"], placeholder="Todos")
+    with filters[3]:
+        date_range = st.date_input(
+            "Período",
+            value=(default_start_date, default_end_date),
+            min_value=min_date,
+            max_value=max_date,
+            format="DD/MM/YYYY",
+        )
+
+if len(date_range) == 2:
+    start_date, end_date = date_range
+else:
+    start_date, end_date = default_start_date, default_end_date
+start, end = start_date.strftime("%Y-%m"), end_date.strftime("%Y-%m")
 
 if start > end:
     st.error("O mês inicial precisa ser anterior ou igual ao mês final.")
     st.stop()
 
-series = get_series(source_data, cidades, grupos)
+series = get_series(source_data, cidades, grupos, gestores)
 period = select_period(source_data, series, start, end)
 admissions_total, terminations_total = int(period["Admissões"].sum()), int(period["Desligamentos"].sum())
 active_final = int(period["Ativos"].iloc[-1]) if not period.empty else 0
@@ -127,7 +143,7 @@ chart_card(
 # ── Indicadores complementares ────────────────────────────────────────────
 # Usam cidade/cargo/período do filtro atual, mas ignoram o filtro de Status —
 # o objetivo aqui é justamente comparar quem ficou com quem saiu.
-population = filter_people(source_data["rows"], cidades, grupos, start, end, "", [])
+population = filter_people(source_data["rows"], cidades, grupos, gestores, start, end, "", [])
 population_days = [humanize_tenure(row["Admissão"], row["Demissão"])[1] for _, row in population.iterrows()]
 population = population.assign(_Dias=population_days)
 dias_ativos = population.loc[population["Status"] == "Ativo", "_Dias"]
@@ -158,11 +174,11 @@ with sort_col_1:
 with sort_col_2:
     sort_dir = st.selectbox("Direção", ["Decrescente", "Crescente"], label_visibility="collapsed")
 with status_col:
-    status_selected = st.multiselect("Status", STATUS_VALUES, placeholder="Ambos", label_visibility="collapsed")
+    status_selected = st.multiselect("Status", STATUS_VALUES, default=["Ativo"], label_visibility="collapsed")
 
-people = filter_people(source_data["rows"], cidades, grupos, start, end, search, status_selected)
+people = filter_people(source_data["rows"], cidades, grupos, gestores, start, end, search, status_selected)
 
-filter_signature = (tuple(cidades), tuple(grupos), start, end, search, tuple(status_selected))
+filter_signature = (tuple(cidades), tuple(grupos), tuple(gestores), start, end, search, tuple(status_selected))
 if st.session_state.get("_filter_signature") != filter_signature:
     st.session_state["_filter_signature"] = filter_signature
     st.session_state["page"] = 1
