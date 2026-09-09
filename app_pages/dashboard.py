@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import io
+
 import streamlit as st
 
 from src import charts
@@ -168,7 +170,7 @@ with header_left:
 with header_right:
     search = st.text_input("Buscar", placeholder="Buscar por ID, nome, cargo ou cidade…", label_visibility="collapsed")
 
-sort_col_1, sort_col_2, status_col, count_col = st.columns([1.7, 1, 1.4, 2.3])
+sort_col_1, sort_col_2, status_col, count_col, export_col = st.columns([1.6, 0.9, 1.3, 1.7, 1.2])
 with sort_col_1:
     sort_label = st.selectbox("Ordenar por", list(SORT_COLUMNS.keys()), index=list(SORT_COLUMNS.keys()).index("Admissão"), label_visibility="collapsed")
 with sort_col_2:
@@ -191,6 +193,20 @@ people = people.assign(TenureText=[text for text, _ in tenure], TenureDays=[days
 
 sort_column = SORT_COLUMNS[sort_label]
 people = people.sort_values(sort_column, ascending=sort_dir == "Crescente", na_position="last")
+
+with export_col:
+    export_df = people[["Registro", "Nome", "Cargo Atual2", "Cidade", "Gestor", "Status", "Admissão", "Demissão", "TenureText"]].rename(
+        columns={"Registro": "ID", "Cargo Atual2": "Cargo", "TenureText": "Permanência"}
+    )
+    excel_buffer = io.BytesIO()
+    export_df.to_excel(excel_buffer, index=False, sheet_name="Colaboradores", engine="openpyxl")
+    st.download_button(
+        "⬇ Exportar",
+        data=excel_buffer.getvalue(),
+        file_name=f"colaboradores_{start}_a_{end}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        width="stretch",
+    )
 
 total_rows = len(people)
 total_pages = max(1, -(-total_rows // PAGE_SIZE))
