@@ -129,12 +129,18 @@ def _month_range(start: str = "2015-04", months_ahead: int = 5) -> tuple[list[st
     return keys, labels
 
 
+# Corte de 10 anos pedido pelo usuário (2026-09-09): desligados até essa data saem da
+# análise (ruído histórico demais antigo). Não afeta ativos (não têm Demissão).
+TERMINATION_CUTOFF = "2015-12-31"
+
+
 def load_source_data() -> dict[str, Any]:
     """Read the row-level base from Postgres (Neon, table `people_rows`) and derive
     every filter option from it. `people_rows` é carregada por `scripts/load_people_data.py`
     (a partir do HTML local ou de um export do Databricks — ver README)."""
     conn = st.connection("sql")
     rows = conn.query(PEOPLE_ROWS_QUERY, ttl=600)
+    rows = rows[(rows["Demissão"] == "") | (rows["Demissão"] > TERMINATION_CUTOFF)].copy()
     rows["Cargo Atual2"] = rows["Cargo Atual2"].map(_normalize_cargo)
     rows = rows[rows["Cargo Atual2"].isin(CARGO_GROUP_MAP)].copy()
     rows["Grupo"] = rows["Cargo Atual2"].map(CARGO_GROUP_MAP)
