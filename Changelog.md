@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.8.1] - 2026-09-09
+
+- **`scripts/sync_from_databricks.py`**: carrega `people_rows` direto do Databricks via OAuth U2M (login interativo no navegador, sem PAT/token), rodando a query real fornecida pelo usuário contra `rh.gold.fato_funcionario_ativo`/`fato_funcionario_inativo` (com join em `enterprise.data.dim_local` pra trazer Cidade). Substitui a etapa manual de exportar CSV do SQL Editor.
+- A query também traz **Gestor** e **Cargo Gestor** (até 5 níveis de hierarquia acima do colaborador, via CTE de reportes) — dado novo, ainda não usado na interface, mas resolve a limitação "Executivos/Gestores — adiado" registrada em "Limitações da base": agora o campo existe na base, falta só o filtro/ranking na UI (não implementado nesta versão).
+- `people_rows` ganhou as colunas `setor`, `gestor`, `cargo_gestor` (nullable — o bootstrap via HTML não preenche).
+- Extraído `scripts/_neon_people.py` (schema + upload da tabela), compartilhado por `load_people_data.py` e `sync_from_databricks.py` — evita as duas fontes de carga divergirem de schema.
+- **Segurança**: o nome do gestor de referência usado na query (um diretor específico) foi parametrizado em `.streamlit/secrets.toml` -> `[databricks].gestor_referencia`, não hardcoded no script — o repositório é público, então nomes de executivos/estrutura organizacional não podem ir para o código versionado.
+
+## [0.8.0] - 2026-09-09
+
+- **Resolvida a pendência crítica da 0.6.0**: `data_logic.load_source_data()` não lê mais o HTML local — passou a consultar a tabela `people_rows` no mesmo Postgres (Neon) já usado pro login, via `st.connection("sql")`. Motivo: enquanto não há credencial do Databricks (PAT/OAuth M2M ainda pendente com o time de dados), o app publicado no Streamlit Cloud ficaria sem nenhum dado (o HTML nunca vai pro GitHub). Com a base no Neon, o deploy volta a funcionar com dado real, e a troca futura pro Databricks fica isolada no script de carga — `load_source_data()` não muda de novo.
+- Novo `scripts/load_people_data.py`: carrega/recarrega `people_rows` (TRUNCATE + insert completo). Por padrão lê o HTML local (usado para o bootstrap inicial); com `--csv arquivo.csv` lê um export manual do Databricks SQL Editor (mesmas colunas). Nunca imprime dado de colaborador — só contagens.
+- Eixo de meses dos gráficos (`labels`/`keys`) deixou de vir do payload do HTML — agora é gerado por `data_logic._month_range()` (fixo em 2015-04 até 5 meses à frente do mês atual), já que essa metadata não depende de colaborador nenhum e assim nenhuma fonte de dado precisa carregá-la.
+- `.gitignore`: adicionado `*.csv` — qualquer export baixado do Databricks é PII e não deve ser versionado (mesma lógica do `assets/*.html`).
+- Adicionado `.streamlit/secrets.toml` (e `.example`) uma seção `[databricks]` (`server_hostname`, `http_path`, `token`, `client_id`, `client_secret`) e `scripts/test_databricks.py`, para quando a credencial (PAT ou service principal) chegar — testa a conexão com o SQL Warehouse sem precisar mexer no restante do app.
+- `requirements.txt`: adicionado `databricks-sql-connector`.
+
 ## [0.7.2] - 2026-09-08
 
 - Removida por completo a "Curva de Retenção por Coorte de Admissão" (a pedido do usuário — não só os 3 cartões da 0.7.1, o indicador inteiro: título, gráfico e legenda). Removidas as funções que só existiam para ela: `data_logic.retention_curve`, `data_logic.weighted_retention`, `charts.retention_curve`. "Permanência Média: Ativos × Desligados" continua no dashboard, sem alteração.

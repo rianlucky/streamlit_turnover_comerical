@@ -10,9 +10,12 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import streamlit as st
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ASSETS_DIR = PROJECT_ROOT / "assets"
+
+MONTH_ABBR_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
 def _find_html_source() -> Path:
@@ -76,25 +79,51 @@ def _extract_json(source: str, declaration: str, next_declaration: str) -> Any:
     return json.loads(match.group(1))
 
 
-def load_source_data() -> dict[str, Any]:
-    """Read the embedded row-level payload and derive every filter option from it."""
-    source = _find_html_source().read_text(encoding="utf-8")
-    payload = _extract_json(source, "PAYLOAD", "ALL_ROWS")
-    raw_rows = _extract_json(source, "ALL_ROWS", "CIDADES")
+PEOPLE_ROWS_QUERY = """
+SELECT
+    registro AS "Registro",
+    nome AS "Nome",
+    cargo_atual2 AS "Cargo Atual2",
+    cidade AS "Cidade",
+    admissao AS "Admissão",
+    demissao AS "Demissão",
+    status AS "Status",
+    perm_meses AS "Perm_meses"
+FROM people_rows
+"""
 
-    rows = pd.DataFrame(raw_rows)
+
+def _month_range(start: str = "2015-04", months_ahead: int = 5) -> tuple[list[str], list[str]]:
+    """Eixo de meses dos gráficos — independe da fonte de dados (por isso não vem mais
+    do Databricks/Neon): começa fixo em `start` e vai até `months_ahead` meses à frente
+    do mês atual, dando folga no eixo para dados dos próximos meses."""
+    end = pd.Timestamp.now().to_period("M") + months_ahead
+    periods = pd.period_range(start=start, end=end, freq="M")
+    keys = [str(p) for p in periods]
+    labels = [f"{MONTH_ABBR_EN[p.month - 1]}/{p.strftime('%y')}" for p in periods]
+    return keys, labels
+
+
+def load_source_data() -> dict[str, Any]:
+    """Read the row-level base from Postgres (Neon, table `people_rows`) and derive
+    every filter option from it. `people_rows` é carregada por `scripts/load_people_data.py`
+    (a partir do HTML local ou de um export do Databricks — ver README)."""
+    conn = st.connection("sql")
+    rows = conn.query(PEOPLE_ROWS_QUERY, ttl=600)
     rows["Grupo"] = rows["Cargo Atual2"].map(CARGO_GROUP_MAP).fillna(rows["Cargo Atual2"])
 
     cidades = sorted(rows["Cidade"].unique())
     grupos_presentes = set(rows["Grupo"])
     grupos = [g for g in CARGO_GROUP_ORDER if g in grupos_presentes] + sorted(grupos_presentes - set(CARGO_GROUP_ORDER))
 
+    keys, labels = _month_range()
+
     return {
         "rows": rows,
         "cidades": cidades,
         "grupos": grupos,
-        "labels": payload["meses_labels"],
-        "keys": payload["meses_keys"],
+        "labels": labels,
+        "keys": keys,
     }
 
 

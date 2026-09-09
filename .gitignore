@@ -12,6 +12,7 @@ Thumbs.db
 # Dados reais de colaboradores (PII) — nunca versionar. O app lê o arquivo local
 # normalmente; ele só fica de fora do git.
 assets/*.html
+*.csv
 node_modules/
 package.json
 package-lock.json
