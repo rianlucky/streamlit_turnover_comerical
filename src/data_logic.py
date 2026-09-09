@@ -63,6 +63,8 @@ _CARGO_ALIASES = {
     "Gerente de Lotes Comerciais": "Gerente de Lotes Comercial",
     "Gerente Comercial": "Gerente de Vendas",
     "Coordenador Comercial": "Coordenador de Vendas",
+    "Coordenadora de Vendas": "Coordenador de Vendas",
+    "Supervisora Comercial": "Supervisor de Vendas",
 }
 
 
@@ -80,6 +82,7 @@ def _normalize_cargo(cargo: str) -> str:
 # de outras áreas, ex.: Marketing, Financeiro Comercial, RH).
 CARGO_GROUP_MAP = {
     "Executivo Comercial": "Executivos",
+    "Executivo de Repasses": "Executivos",
     "Gerente de Vendas": "Gerente",
     "Gerente de Lotes Comercial": "Gerente",
     "Gerente de Repasses": "Gerente",
