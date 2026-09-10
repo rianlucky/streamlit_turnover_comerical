@@ -8,6 +8,7 @@ import streamlit as st
 
 from src.auth import init_db
 from src.auth_ui import render_sidebar_account, require_login
+from src.components import render_sidebar_status
 from src.styles import inject_css
 
 ICON_DIR = Path(__file__).parent / "assets" / "icons"
@@ -22,6 +23,7 @@ require_login()
 
 st.logo(str(LOGO), icon_image=str(ICON))
 render_sidebar_account()
+render_sidebar_status()
 
 pages = [
     st.Page("app_pages/dashboard.py", title="Movimentação de Pessoas", icon=":material/groups:", default=True),

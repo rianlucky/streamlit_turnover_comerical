@@ -21,16 +21,20 @@ Turnover Comercial/
 │   ├── test_databricks.py     # CLI para testar a conexão com o SQL Warehouse (PAT ou OAuth M2M)
 │   └── _neon_people.py        # Schema/upload de people_rows — compartilhado pelos dois scripts acima
 ├── app_pages/
-│   ├── dashboard.py          # Página principal (KPIs, gráficos, tabela) — conteúdo que antes estava em app.py
+│   ├── dashboard.py          # Página principal (KPIs, gráficos, mapa, tabela)
+│   ├── ranking.py            # Top 5 de turnover/desligamentos por Cidade, Cargo e Gestor
 │   └── comparativo_turnover.py  # Comparativo das fórmulas de turnover (Comercial × D.O.)
+├── OBSOLETO.md              # Registro de campos/colunas que existem mas o app não lê mais
 └── src/
     ├── data_logic.py        # Carga de dados e regras de negócio (turnover, headcount, filtros)
-    ├── charts.py            # Gráficos Plotly que replicam os gráficos Chart.js do HTML original
-    ├── components.py        # KPIs, cartões de gráfico e tabela analítica (HTML/CSS)
-    ├── styles.py            # Paleta de cores, fonte DM Sans e CSS injetado no app
-    ├── auth.py              # Login (hash bcrypt + Postgres/Neon)
-    └── auth_ui.py           # Telas de login (e-mail -> sem acesso / criar senha / senha)
+    ├── charts.py            # Gráficos Plotly (inclui o mapa de concentração e o ranking em barra)
+    ├── components.py        # KPIs, cartões de gráfico, tabela analítica e status da barra lateral
+    ├── styles.py            # Paleta de cores, fonte DM Sans e CSS injetado no app (dash + login)
+    ├── auth.py              # Login (hash bcrypt + Postgres/Neon), com bloqueio por tentativas
+    └── auth_ui.py           # Telas de login (cartão dividido: marca + formulário)
 ```
+
+Existe também um `NEXTSTEPS.md` na raiz — notas internas de risco/pendência da última auditoria, **não versionado** (uso local, ver `.gitignore`).
 
 ## Origem dos dados
 
@@ -63,6 +67,8 @@ O app exige login por e-mail. As credenciais ficam em uma tabela Postgres (Neon)
 
 Fluxo: a pessoa digita o e-mail; se ele não tiver acesso liberado, o app orienta a solicitar a inclusão a `rian.jesus@pacaembu.com`; se tiver acesso e for o primeiro login, ela cria a própria senha; se já tiver senha, só digita ela.
 
+Depois de 5 tentativas de senha erradas seguidas, a conta fica bloqueada por 15 minutos (mitigação simples de força bruta, sem serviço externo — `src/auth.py`).
+
 1. Copie `.streamlit/secrets.toml.example` para `.streamlit/secrets.toml` e preencha `[connections.sql].url` com a connection string do seu projeto Neon (também precisa ser configurado nos "Secrets" do app quando publicado no Streamlit Cloud).
 2. Conceda acesso aos e-mails autorizados (sem senha — cada um cria a própria):
    ```powershell
@@ -79,12 +85,16 @@ python -m streamlit run app.py
 ## Filtros e interações
 
 - **Cidade** (multiseleção, exibida como "Cidade/UF"; vazio = Global/todas).
-- **Cargo** (multiseleção com 7 grupos agregados: Auxiliar, Assistentes, Analistas, Analistas Parcerias, Supervisor, Coordenador, Gerente; vazio = todos).
-- **Período** (De/Até, dois campos digitáveis). Padrão: últimos 12 meses a partir do último mês com dado na base.
-- **Status** (multiseleção Ativo/Desligado; vazio = ambos).
-- Busca por nome, cargo, cidade **ou ID**, ordenação por coluna e paginação de 20 em 20 na tabela de colaboradores.
-- KPIs, 5 visualizações (admissões × demissões, turnover real, headcount ativo, saldo líquido, indicador legado — as 4 últimas com rótulo do maior/menor valor) e tabela analítica com permanência humanizada ("2 anos e 3 meses", "5 meses", "18 dias"...).
-- Indicador complementar: Permanência Média (Ativos × Desligados).
-- Segunda página na barra lateral, **Comparativo Turnover**: compara a fórmula de turnover do Comercial (efetivo médio do mês) com a do D.O. (efetivo do fechamento do mês anterior), lado a lado, com recomendação de qual seguir como indicador oficial.
+- **Cargo** (multiseleção por grupo agregado: Auxiliar, Assistentes, Analistas, Analistas Parcerias, Supervisor, Coordenador, Gerente, Executivos; vazio = todos).
+- **Gestor** (multiseleção; cobertura parcial para desligados — ver `NEXTSTEPS.md`).
+- **Equipe** (Vendas UH / Lotes Comerciais / Repasses — segmento de negócio, independente da Cidade real do colaborador).
+- **Período** (calendário único, `st.date_input`). Padrão: últimos 12 meses a partir do último mês com dado na base.
+- **Status** (multiseleção Ativo/Desligado, na tabela; padrão Ativo).
+- Busca por nome, cargo, cidade (**sem acento** — "aracatuba" acha "Araçatuba") ou ID, ordenação por coluna, paginação de 20 em 20 e exportação para Excel.
+- KPIs, 8 visualizações (admissões × demissões, turnover real, headcount ativo, saldo líquido, desligamentos por tipo, turnover voluntário, indicador legado, mapa de concentração de mão de obra) e tabela analítica com permanência humanizada.
+- Indicador complementar: Permanência Média (Ativos × Desligados), com barra comparativa.
+- Página **Ranking**: Top 5 de turnover médio e de total de desligamentos, por Cidade, Cargo e Gestor.
+- Página **Comparativo Turnover**: compara a fórmula de turnover do Comercial (efetivo médio do mês) com a do D.O. (efetivo do fechamento do mês anterior).
+- Barra lateral: data da última sincronização da base e contadores de cargo/cidade fora do mapeamento (texto cinza, embaixo da navegação).
 
-O turnover real e o indicador legado seguem as fórmulas existentes no HTML original — ver `Context.md`, que também documenta as limitações atuais de dados (UF inferida manualmente; sem campo de gestor/executivo, previsto para quando entrar o Databricks).
+O turnover real e o indicador legado seguem as fórmulas do painel original que este dashboard substituiu — ver `Context.md` (decisões e histórico) e `NEXTSTEPS.md` (riscos/limitações em aberto, não versionado).

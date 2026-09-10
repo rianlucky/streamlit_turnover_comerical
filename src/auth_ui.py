@@ -16,7 +16,16 @@ from typing import Callable
 
 import streamlit as st
 
-from src.auth import SUPPORT_EMAIL, get_user, needs_password_setup, normalize_email, set_initial_password, verify_login
+from src.auth import (
+    SUPPORT_EMAIL,
+    get_user,
+    is_locked,
+    lock_remaining_minutes,
+    needs_password_setup,
+    normalize_email,
+    set_initial_password,
+    verify_login,
+)
 
 _LOGO_PATH = Path(__file__).resolve().parent.parent / "assets" / "icons" / "logo_sidebar.png"
 
@@ -99,6 +108,14 @@ def _screen_set_password(user: dict) -> None:
 
 def _screen_login(user: dict) -> None:
     def form() -> None:
+        if is_locked(user):
+            minutos = lock_remaining_minutes(user)
+            st.warning(f"Conta temporariamente bloqueada por tentativas de senha incorreta. Tente novamente em ~{minutos} minuto(s).")
+            if st.button("Usar outro e-mail", key="switch_email"):
+                st.session_state["auth_email"] = None
+                st.rerun()
+            return
+
         password = st.text_input("Senha", type="password", label_visibility="collapsed", placeholder="Digite sua senha")
         if st.button("Entrar", width="stretch"):
             verified = verify_login(user["email"], password)
@@ -106,7 +123,11 @@ def _screen_login(user: dict) -> None:
                 st.session_state["auth_user"] = verified
                 st.rerun()
             else:
-                st.error("Senha incorreta.")
+                refreshed = get_user(user["email"])
+                if refreshed and is_locked(refreshed):
+                    st.error(f"Muitas tentativas erradas — conta bloqueada por ~{lock_remaining_minutes(refreshed)} minuto(s).")
+                else:
+                    st.error("Senha incorreta.")
         if st.button("Usar outro e-mail", key="switch_email"):
             st.session_state["auth_email"] = None
             st.rerun()

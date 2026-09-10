@@ -1,5 +1,61 @@
 # Changelog
 
+## [1.0.0] - 2026-09-10
+
+Fecha a V1: base real do Databricks em produção, filtros/indicadores novos e
+uma auditoria de fechamento (segurança, dado dinâmico, visibilidade). Resume
+tudo que ficou faltando entre o 0.8.1 e aqui, que não tinha sido registrado
+version a versão.
+
+**Filtros e dados**
+- Filtro **Gestor** e **Equipe** (segmento de negócio: "Vendas UH"/"Lotes
+  Comerciais"/"Repasses" — separado da Cidade, que voltou a ser sempre o
+  local real do colaborador).
+- Período trocado para um único seletor de calendário (`st.date_input`).
+- `CARGO_GROUP_MAP` restrito aos cargos comerciais confirmados pelo usuário
+  (normaliza senioridade Junior/Pleno/Sênior e variantes de gênero/typo).
+- Corte de desligados: só entram na análise os últimos 10 anos —
+  **dinâmico** (`hoje − 10 anos`, recalculado a cada carga), assim como o
+  início do eixo de meses dos gráficos.
+- Cidade normalizada (CAIXA ALTA sem acento -> nome "bonito" com UF).
+
+**Indicadores e páginas novas**
+- **Turnover Voluntário**: query traz `Tipo Desligamento` (Voluntário/
+  Involuntário/Acordo/Transferência); 2 gráficos novos (desligamentos por
+  tipo empilhado, turnover voluntário mensal).
+- Nova aba **Ranking**: Top 5 de turnover médio e desligamentos por
+  Cidade/Cargo/Gestor.
+- **Mapa de concentração de mão de obra** (bolhas por cidade, só ativos) e
+  gráfico comparativo na Permanência Média — ao lado do card já existente.
+- Exportar para Excel na tabela "Colaboradores no filtro".
+
+**Segurança e confiabilidade**
+- Login: bloqueio de conta após 5 tentativas de senha erradas (15 min),
+  mitigando força bruta — `src/auth.py`.
+- Corrigido incidente de produção: `get_data()` cacheava indefinidamente
+  entre deploys (bytecode da função nunca mudava, mesmo com
+  `load_source_data()` mudando toda hora) — removida a camada de cache.
+- Corrigido "SSL connection has been closed unexpectedly" do Neon
+  (`pool_pre_ping`/`pool_recycle`) + tela de erro amigável no login.
+- Carga do Neon (`_neon_people.replace_people_rows`) ficou atômica
+  (TRUNCATE + insert na mesma transação) depois de dois incidentes de
+  base zerada por query vazia/duplicata/erro de tipo.
+
+**Login redesenhado**
+- Cartão dividido (marca + logo à esquerda, formulário à direita), no
+  padrão comum de telas de login de mercado.
+
+**Fechamento da auditoria (2026-09-10)**
+- Busca da tabela agora ignora acento.
+- `perm_meses` parou de ser lido (nunca foi usado em cálculo — ver
+  `OBSOLETO.md`, criado nesta versão).
+- Barra lateral: "Dados atualizados em" (nova tabela `sync_meta`) + contador
+  de registros com cargo/cidade fora do mapeamento — visibilidade em vez de
+  descoberta manual, já que a base é atualizada mensalmente.
+- Pendências que sobraram (sync manual, sem PAT ainda, sem testes
+  automatizados, cobertura parcial de Gestor em desligados, 6 pessoas sem
+  cidade) registradas em `NEXTSTEPS.md` (uso interno, não versionado).
+
 ## [0.8.1] - 2026-09-09
 
 - **`scripts/sync_from_databricks.py`**: carrega `people_rows` direto do Databricks via OAuth U2M (login interativo no navegador, sem PAT/token), rodando a query real fornecida pelo usuário contra `rh.gold.fato_funcionario_ativo`/`fato_funcionario_inativo` (com join em `enterprise.data.dim_local` pra trazer Cidade). Substitui a etapa manual de exportar CSV do SQL Editor.

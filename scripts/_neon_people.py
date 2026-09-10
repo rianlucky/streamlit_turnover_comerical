@@ -32,6 +32,17 @@ CREATE TABLE IF NOT EXISTS people_rows (
 )
 """
 
+# Uma linha só (id=1) — timestamp da última carga bem-sucedida, exibido na barra
+# lateral do app ("dados atualizados em"). Ver OBSOLETO.md pra outros campos
+# gravados mas não lidos — esse aqui é o oposto: só escrito e lido, sem PII.
+CREATE_SYNC_META_SQL = """
+CREATE TABLE IF NOT EXISTS sync_meta (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    synced_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT sync_meta_single_row CHECK (id = 1)
+)
+"""
+
 # Cobre tabelas criadas antes destas colunas existirem (idempotente).
 ALTER_TABLE_SQL = [
     "ALTER TABLE people_rows ADD COLUMN IF NOT EXISTS setor TEXT",
@@ -115,4 +126,6 @@ def replace_people_rows(df: pd.DataFrame) -> int:
             conn.execute(text(stmt))
         conn.execute(text("TRUNCATE TABLE people_rows"))
         df.to_sql("people_rows", conn, if_exists="append", index=False, method="multi", chunksize=200)
+        conn.execute(text(CREATE_SYNC_META_SQL))
+        conn.execute(text("INSERT INTO sync_meta (id, synced_at) VALUES (1, now()) ON CONFLICT (id) DO UPDATE SET synced_at = now()"))
     return len(df)

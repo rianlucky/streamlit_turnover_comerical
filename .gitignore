@@ -20,3 +20,7 @@ _shot*.png
 _shot*.js
 _smoke*.py
 .claude/
+
+# Notas internas de próximos passos/riscos em aberto — uso interno, não é
+# documentação do projeto pra quem clonar do zero (fica só local).
+NEXTSTEPS.md

@@ -9,7 +9,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from src.data_logic import tenure_class
+from src.data_logic import load_source_data, tenure_class
 
 KPI_SPEC = [
     # (key, css_class, label)
@@ -93,3 +93,29 @@ def render_table(page_rows: pd.DataFrame) -> str:
         "</tr></thead>"
     )
     return f'<div class="tbl-wrap"><table class="tbl">{header}<tbody>{"".join(body_rows)}</tbody></table></div>'
+
+
+def render_sidebar_status() -> None:
+    """Rodapé cinza na barra lateral: quando a base foi sincronizada pela última
+    vez, e quantos registros ficaram de fora por cargo/cidade ainda não mapeados
+    — visibilidade de dado que falta em vez de descoberta manual (o dash é
+    atualizado mensalmente; isso sinaliza cargo/cidade novo assim que aparecer,
+    sem precisar de revisão trimestral)."""
+    source_data = load_source_data()
+
+    synced_at = source_data.get("synced_at")
+    if synced_at is not None:
+        texto_sync = pd.Timestamp(synced_at).tz_convert("America/Sao_Paulo").strftime("%d/%m/%Y %H:%M")
+        linhas = [f"Dados atualizados em {texto_sync}"]
+    else:
+        linhas = ["Sem registro de sincronização"]
+
+    cargos_fora = source_data.get("cargos_nao_mapeados", 0)
+    cidades_fora = source_data.get("cidades_nao_mapeadas", 0)
+    if cargos_fora:
+        linhas.append(f"{cargos_fora} registro(s) com cargo fora do mapeamento")
+    if cidades_fora:
+        linhas.append(f"{cidades_fora} registro(s) com cidade fora do mapeamento")
+
+    with st.sidebar:
+        st.html(f'<div class="sidebar-status">{"<br>".join(escape(linha) for linha in linhas)}</div>')

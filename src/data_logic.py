@@ -5,6 +5,7 @@ from __future__ import annotations
 import calendar
 import json
 import re
+import unicodedata
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -194,6 +195,8 @@ def _extract_json(source: str, declaration: str, next_declaration: str) -> Any:
     return json.loads(match.group(1))
 
 
+# `perm_meses` NÃO entra aqui de propósito — ver OBSOLETO.md. Continua sendo
+# gravada em people_rows (histórico), só não é mais lida por lugar nenhum do app.
 PEOPLE_ROWS_QUERY = """
 SELECT
     registro AS "Registro",
@@ -203,17 +206,30 @@ SELECT
     admissao AS "Admissão",
     demissao AS "Demissão",
     status AS "Status",
-    perm_meses AS "Perm_meses",
     gestor AS "Gestor",
     tipo_desligamento AS "Tipo Desligamento"
 FROM people_rows
 """
 
 
-def _month_range(start: str = "2015-04", months_ahead: int = 5) -> tuple[list[str], list[str]]:
+def _years_ago(years: int) -> date:
+    """Hoje menos N anos — usado pro corte de desligamento e pro início do eixo de
+    meses, pra andarem sozinhos com o tempo em vez de precisar de revisão manual."""
+    today = date.today()
+    try:
+        return today.replace(year=today.year - years)
+    except ValueError:
+        # 29/02 caindo num ano não bissexto N anos atrás.
+        return today.replace(year=today.year - years, day=28)
+
+
+def _month_range(start: str | None = None, months_ahead: int = 5) -> tuple[list[str], list[str]]:
     """Eixo de meses dos gráficos — independe da fonte de dados (por isso não vem mais
-    do Databricks/Neon): começa fixo em `start` e vai até `months_ahead` meses à frente
-    do mês atual, dando folga no eixo para dados dos próximos meses."""
+    do Databricks/Neon): por padrão começa 10 anos atrás (mesma janela do corte de
+    desligamento) e vai até `months_ahead` meses à frente do mês atual, dando folga
+    no eixo para dados dos próximos meses."""
+    if start is None:
+        start = _years_ago(10).strftime("%Y-%m")
     end = pd.Timestamp.now().to_period("M") + months_ahead
     periods = pd.period_range(start=start, end=end, freq="M")
     keys = [str(p) for p in periods]
@@ -221,9 +237,25 @@ def _month_range(start: str = "2015-04", months_ahead: int = 5) -> tuple[list[st
     return keys, labels
 
 
-# Corte de 10 anos pedido pelo usuário (2026-09-09): desligados até essa data saem da
-# análise (ruído histórico demais antigo). Não afeta ativos (não têm Demissão).
-TERMINATION_CUTOFF = "2015-12-31"
+def _termination_cutoff() -> str:
+    """Corte de 10 anos (pedido do usuário, 2026-09-09): desligados até essa data
+    saem da análise (ruído histórico demais antigo). Não afeta ativos (não têm
+    Demissão). Calculado a cada chamada (não é mais uma constante fixa), pra não
+    precisar de revisão manual daqui uns anos — sempre "hoje - 10 anos"."""
+    return _years_ago(10).isoformat()
+
+
+def _read_synced_at() -> "pd.Timestamp | None":
+    """Quando `people_rows` foi carregada pela última vez (scripts/_neon_people.py
+    grava isso em `sync_meta` a cada load_people_data.py/sync_from_databricks.py).
+    None se a tabela ainda não existir (deploy novo, antes do primeiro sync) ou
+    estiver vazia — tratado na tela como "sem registro de sincronização"."""
+    conn = st.connection("sql")
+    try:
+        df = conn.query("SELECT synced_at FROM sync_meta WHERE id = 1", ttl=60)
+    except Exception:
+        return None
+    return None if df.empty else df.iloc[0]["synced_at"]
 
 
 def load_source_data() -> dict[str, Any]:
@@ -232,16 +264,21 @@ def load_source_data() -> dict[str, Any]:
     (a partir do HTML local ou de um export do Databricks — ver README)."""
     conn = st.connection("sql")
     rows = conn.query(PEOPLE_ROWS_QUERY, ttl=600)
-    rows = rows[(rows["Demissão"] == "") | (rows["Demissão"] > TERMINATION_CUTOFF)].copy()
+    rows = rows[(rows["Demissão"] == "") | (rows["Demissão"] > _termination_cutoff())].copy()
     rows["Cargo Atual2"] = rows["Cargo Atual2"].map(_normalize_cargo)
+    total_antes_cargo = len(rows)
     rows = rows[rows["Cargo Atual2"].isin(CARGO_GROUP_MAP)].copy()
+    cargos_nao_mapeados = total_antes_cargo - len(rows)
     rows["Grupo"] = rows["Cargo Atual2"].map(CARGO_GROUP_MAP)
 
     # Databricks devolve a cidade em CAIXA ALTA sem acento — normaliza pro nome
     # "bonito" (usado em CITY_UF/CITY_COORDS e exibido na tela). Cidade sempre é o
     # local real do colaborador agora — o segmento de negócio (Lotes/Repasses) vive
-    # à parte, no campo Equipe (ver abaixo).
-    rows["Cidade"] = rows["Cidade"].map(_display_city)
+    # à parte, no campo Equipe (ver abaixo). Conta quem caiu no fallback de título
+    # (_title_case_pt) — sinal de cidade nova ainda não cadastrada em CITY_RAW_TO_DISPLAY.
+    cidade_bruta = rows["Cidade"]
+    cidades_nao_mapeadas = int(((cidade_bruta != "") & ~cidade_bruta.isin(CITY_RAW_TO_DISPLAY)).sum())
+    rows["Cidade"] = cidade_bruta.map(_display_city)
 
     # Equipe: segmento de negócio, separado de Cidade/Grupo. Regra pedida pelo
     # usuário (2026-09-10) — default "Vendas UH" pra quem não é Lotes/Repasses.
@@ -268,6 +305,9 @@ def load_source_data() -> dict[str, Any]:
         "grupos": grupos,
         "gestores": gestores,
         "equipes": equipes,
+        "cargos_nao_mapeados": cargos_nao_mapeados,
+        "cidades_nao_mapeadas": cidades_nao_mapeadas,
+        "synced_at": _read_synced_at(),
         "labels": labels,
         "keys": keys,
     }
@@ -404,6 +444,13 @@ def dimension_ranking(source_data: dict[str, Any], dimension: str, start: str, e
     return pd.DataFrame(records)
 
 
+def _strip_accents(value: str) -> str:
+    """Remove acentos (NFKD + descarta marcas de combinação) — usado na busca da
+    tabela pra "aracatuba" achar "Araçatuba" mesmo sem cedilha (a Cidade passou a
+    vir com acento depois da normalização de nome — ver _display_city)."""
+    return "".join(c for c in unicodedata.normalize("NFKD", value) if not unicodedata.combining(c))
+
+
 def filter_people(rows: pd.DataFrame, cidades: list[str], grupos: list[str], gestores: list[str], equipes: list[str], start: str, end: str, search: str, status_selected: list[str] | None = None) -> pd.DataFrame:
     filtered = filter_cidade_grupo(rows, cidades, grupos, gestores, equipes)
     admissions = filtered["Admissão"].fillna("")
@@ -411,12 +458,12 @@ def filter_people(rows: pd.DataFrame, cidades: list[str], grupos: list[str], ges
     filtered = filtered[(admissions <= f"{end}-31") & (terminations >= f"{start}-01")]
     if status_selected:
         filtered = filtered[filtered["Status"].isin(status_selected)]
-    query = search.strip().lower()
+    query = _strip_accents(search.strip().lower())
     if query:
         mask = (
-            filtered["Nome"].str.lower().str.contains(query, na=False)
-            | filtered["Cargo Atual2"].str.lower().str.contains(query, na=False)
-            | filtered["Cidade"].str.lower().str.contains(query, na=False)
+            filtered["Nome"].str.lower().map(_strip_accents).str.contains(query, na=False)
+            | filtered["Cargo Atual2"].str.lower().map(_strip_accents).str.contains(query, na=False)
+            | filtered["Cidade"].str.lower().map(_strip_accents).str.contains(query, na=False)
             | filtered["Registro"].astype(str).str.contains(query, na=False)
         )
         filtered = filtered[mask]

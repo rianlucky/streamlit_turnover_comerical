@@ -120,6 +120,8 @@ label[data-testid="stWidgetLabel"] p {{
 
 .pag-info {{ font-size:12px; color:var(--mid); }}
 
+.sidebar-status {{ font-size:10.5px; color:var(--mid); line-height:1.7; margin-top:6px; }}
+
 /* ── Tela de login (cartão dividido: marca à esquerda, formulário à direita) ── */
 .st-key-login_page {{ margin-top:10vh; }}
 [data-testid="stVerticalBlockBorderWrapper"].st-key-login_card {{
