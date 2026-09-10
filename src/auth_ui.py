@@ -37,6 +37,15 @@ def _screen_email() -> None:
                     st.rerun()
 
 
+def _screen_connection_error() -> None:
+    _header("Erro temporário de conexão")
+    with _centered():
+        with st.container(border=True):
+            st.error("Não foi possível conectar ao banco de dados agora. Isso costuma ser passageiro — tente novamente em alguns segundos.")
+            if st.button("Tentar novamente", width="stretch"):
+                st.rerun()
+
+
 def _screen_no_access(email: str) -> None:
     _header("Acesso não encontrado")
     with _centered():
@@ -90,7 +99,12 @@ def require_login() -> None:
         _screen_email()
         st.stop()
 
-    user = get_user(email)
+    try:
+        user = get_user(email)
+    except Exception:
+        _screen_connection_error()
+        st.stop()
+
     if user is None:
         _screen_no_access(email)
     elif needs_password_setup(user):
