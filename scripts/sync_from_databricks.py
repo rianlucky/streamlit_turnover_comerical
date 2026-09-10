@@ -49,7 +49,8 @@ SELECT
   f.data_desligamento AS Demissao,
   COALESCE(rb1.nome_funcionario, rb2.nome_funcionario, rb3.nome_funcionario, rb4.nome_funcionario, rb5.nome_funcionario) AS Gestor,
   COALESCE(rb1.descricao_cargo, rb2.descricao_cargo, rb3.descricao_cargo, rb4.descricao_cargo, rb5.descricao_cargo) AS `Cargo Gestor`,
-  'Ativo' AS Status
+  'Ativo' AS Status,
+  NULL AS `Tipo Desligamento`
 FROM rh.gold.fato_funcionario_ativo f
 LEFT JOIN enterprise.data.dim_local l ON f.descricao_local = l.descricao_local
 LEFT JOIN reportes_breno rb1 ON f.id_funcionario = rb1.id_funcionario
@@ -76,7 +77,8 @@ SELECT
   f.descricao_departamento, l.cidade, f.id_funcionario, f.nome_funcionario, f.descricao_cargo,
   COALESCE(f.data_admissao_grupo, f.data_admissao), f.data_desligamento,
   NULL AS Gestor, NULL AS `Cargo Gestor`,
-  'Ativo'
+  'Ativo',
+  NULL AS `Tipo Desligamento`
 FROM rh.gold.fato_funcionario_inativo f
 LEFT JOIN enterprise.data.dim_local l ON f.descricao_local = l.descricao_local
 WHERE (f.nome_diretoria = 'Diretoria Comercial'
@@ -95,7 +97,15 @@ SELECT
   f.descricao_departamento, l.cidade, f.id_funcionario, f.nome_funcionario, f.descricao_cargo,
   COALESCE(f.data_admissao_grupo, f.data_admissao), f.data_desligamento,
   NULL AS Gestor, NULL AS `Cargo Gestor`,
-  'Desligado'
+  'Desligado',
+  CASE
+    WHEN f.acao = 'Pedido de Demissão' THEN 'Voluntário'
+    WHEN f.acao IN ('Demissão sem Justa Causa', 'Demissão por Justa Causa',
+                     'Término do Contrato a Termo', 'Morte') THEN 'Involuntário'
+    WHEN f.acao = 'Acordo entre Empregado e Empregador' THEN 'Acordo'
+    WHEN f.acao = 'Transferência Global' THEN 'Transferência'
+    ELSE f.acao
+  END AS `Tipo Desligamento`
 FROM rh.gold.fato_funcionario_inativo f
 LEFT JOIN enterprise.data.dim_local l ON f.descricao_local = l.descricao_local
 WHERE (f.nome_diretoria = 'Diretoria Comercial'
@@ -147,6 +157,8 @@ def main() -> None:
 
     n_ativos = int((df["Status"] == "Ativo").sum()) if not df.empty else 0
     n_desligados = int((df["Status"] == "Desligado").sum()) if not df.empty else 0
+    n_voluntario = int((df["Tipo Desligamento"] == "Voluntário").sum()) if not df.empty else 0
+    n_involuntario = int((df["Tipo Desligamento"] == "Involuntário").sum()) if not df.empty else 0
     try:
         total = replace_people_rows(df)
     except EmptySourceError as exc:
@@ -154,6 +166,7 @@ def main() -> None:
         print("Confira a query/permissões no Databricks antes de rodar de novo — people_rows não foi tocada.")
         sys.exit(1)
     print(f"Carregados {total} registros em people_rows (fonte: Databricks). Ativos: {n_ativos} | Desligados: {n_desligados}")
+    print(f"Desligamentos por tipo — Voluntário: {n_voluntario} | Involuntário: {n_involuntario} | Outros/sem classificação: {n_desligados - n_voluntario - n_involuntario}")
 
 
 if __name__ == "__main__":

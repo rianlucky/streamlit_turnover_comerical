@@ -122,7 +122,8 @@ SELECT
     demissao AS "Demissão",
     status AS "Status",
     perm_meses AS "Perm_meses",
-    gestor AS "Gestor"
+    gestor AS "Gestor",
+    tipo_desligamento AS "Tipo Desligamento"
 FROM people_rows
 """
 
@@ -200,30 +201,51 @@ def build_monthly_series(rows: pd.DataFrame, keys: list[str]) -> dict[str, list[
 
     Também calcula ``turn_do``: a variante do turnover real usada pelo D.O., que divide
     pelo efetivo do último dia do mês anterior em vez da média entre início e fim do mês
-    (ver ``charts.comparativo_turnover`` / página "Comparativo Turnover")."""
+    (ver ``charts.comparativo_turnover`` / página "Comparativo Turnover"), e
+    ``voluntario``/``involuntario``/``turn_voluntario``: desligamentos por tipo (campo
+    ``Tipo Desligamento``, vem do Databricks) e o turnover voluntário — mesma fórmula do
+    turnover real (÷ efetivo médio do mês), mas só com desligamentos voluntários no
+    numerador (sem admissões, já que a métrica mede especificamente saída por vontade
+    própria, não movimento geral)."""
     if rows.empty:
         zeros = [0] * len(keys)
-        return {"at": zeros, "adm": zeros, "dem": zeros, "turn": [0.0] * len(keys), "turn_do": [0.0] * len(keys), "turn_dem_ant": [0.0] * len(keys)}
+        zeros_f = [0.0] * len(keys)
+        return {
+            "at": zeros, "adm": zeros, "dem": zeros,
+            "turn": zeros_f, "turn_do": zeros_f, "turn_dem_ant": zeros_f,
+            "voluntario": zeros, "involuntario": zeros, "turn_voluntario": zeros_f,
+        }
 
     admissao = pd.to_datetime(rows["Admissão"], errors="coerce")
     demissao = pd.to_datetime(rows["Demissão"].replace("", None), errors="coerce")
+    tipo = rows["Tipo Desligamento"]
+    is_voluntario = tipo == "Voluntário"
+    is_involuntario = tipo == "Involuntário"
 
-    at, adm, dem = [], [], []
+    at, adm, dem, voluntario, involuntario = [], [], [], [], []
     for key in keys:
         start, end = _month_bounds(key)
+        in_month = (demissao >= start) & (demissao <= end)
         adm.append(int(((admissao >= start) & (admissao <= end)).sum()))
-        dem.append(int(((demissao >= start) & (demissao <= end)).sum()))
+        dem.append(int(in_month.sum()))
         at.append(int(((admissao <= end) & (demissao.isna() | (demissao > end))).sum()))
+        voluntario.append(int((in_month & is_voluntario).sum()))
+        involuntario.append(int((in_month & is_involuntario).sum()))
 
-    turn, turn_do, turn_dem_ant, previous_at = [], [], [], None
-    for current_at, admissions, terminations in zip(at, adm, dem):
+    turn, turn_do, turn_dem_ant, turn_voluntario, previous_at = [], [], [], [], None
+    for current_at, admissions, terminations, vol in zip(at, adm, dem, voluntario):
         at_start = current_at if previous_at is None else previous_at
         average_headcount = (at_start + current_at) / 2
         turn.append(round((admissions + terminations) / 2 / average_headcount * 100, 2) if average_headcount else 0.0)
         turn_do.append(round((admissions + terminations) / 2 / at_start * 100, 2) if at_start else 0.0)
         turn_dem_ant.append(round(terminations / at_start * 100, 2) if at_start else 0.0)
+        turn_voluntario.append(round(vol / average_headcount * 100, 2) if average_headcount else 0.0)
         previous_at = current_at
-    return {"at": at, "adm": adm, "dem": dem, "turn": turn, "turn_do": turn_do, "turn_dem_ant": turn_dem_ant}
+    return {
+        "at": at, "adm": adm, "dem": dem,
+        "turn": turn, "turn_do": turn_do, "turn_dem_ant": turn_dem_ant,
+        "voluntario": voluntario, "involuntario": involuntario, "turn_voluntario": turn_voluntario,
+    }
 
 
 def filter_cidade_grupo(rows: pd.DataFrame, cidades: list[str], grupos: list[str], gestores: list[str]) -> pd.DataFrame:
@@ -255,7 +277,19 @@ def last_active_month(rows: pd.DataFrame) -> str:
 
 def select_period(source_data: dict[str, Any], series: dict[str, list[float]], start: str, end: str) -> pd.DataFrame:
     start_index, end_index = max(0, source_data["keys"].index(start)), min(len(source_data["keys"]) - 1, source_data["keys"].index(end))
-    return pd.DataFrame({"Mês": source_data["labels"][start_index:end_index + 1], "Chave": source_data["keys"][start_index:end_index + 1], "Ativos": series["at"][start_index:end_index + 1], "Admissões": series["adm"][start_index:end_index + 1], "Desligamentos": series["dem"][start_index:end_index + 1], "Turnover real (%)": series["turn"][start_index:end_index + 1], "Turnover D.O. (%)": series["turn_do"][start_index:end_index + 1], "Legado (%)": series["turn_dem_ant"][start_index:end_index + 1]})
+    return pd.DataFrame({
+        "Mês": source_data["labels"][start_index:end_index + 1],
+        "Chave": source_data["keys"][start_index:end_index + 1],
+        "Ativos": series["at"][start_index:end_index + 1],
+        "Admissões": series["adm"][start_index:end_index + 1],
+        "Desligamentos": series["dem"][start_index:end_index + 1],
+        "Turnover real (%)": series["turn"][start_index:end_index + 1],
+        "Turnover D.O. (%)": series["turn_do"][start_index:end_index + 1],
+        "Legado (%)": series["turn_dem_ant"][start_index:end_index + 1],
+        "Desligamentos Voluntários": series["voluntario"][start_index:end_index + 1],
+        "Desligamentos Involuntários": series["involuntario"][start_index:end_index + 1],
+        "Turnover Voluntário (%)": series["turn_voluntario"][start_index:end_index + 1],
+    })
 
 
 def filter_people(rows: pd.DataFrame, cidades: list[str], grupos: list[str], gestores: list[str], start: str, end: str, search: str, status_selected: list[str] | None = None) -> pd.DataFrame:

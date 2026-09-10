@@ -89,6 +89,7 @@ admissions_total, terminations_total = int(period["Admissões"].sum()), int(peri
 active_final = int(period["Ativos"].iloc[-1]) if not period.empty else 0
 turnover_media = mean_nonzero(period["Turnover real (%)"])
 legado_media = mean_nonzero(period["Legado (%)"])
+voluntario_media = mean_nonzero(period["Turnover Voluntário (%)"])
 saldo_total = admissions_total - terminations_total
 
 kpi_row(
@@ -133,6 +134,22 @@ with row_two[1]:
         "Saldo Líquido Mensal",
         "Admissões − Demissões",
         [("#16a34a", "Positivo", 1), ("#dc2626", "Negativo", 1)],
+    )
+
+row_three = st.columns(2)
+with row_three[0]:
+    chart_card(
+        charts.desligamentos_por_tipo(period),
+        "Desligamentos por Tipo",
+        "Voluntário × Involuntário, empilhados por mês",
+        [("#dc2626", "Voluntário", 1), ("#64748b", "Involuntário", 1)],
+    )
+with row_three[1]:
+    chart_card(
+        charts.turnover_voluntario(period, voluntario_media),
+        "Turnover Voluntário Mensal (%)",
+        "Desligamentos voluntários ÷ Efetivo médio do mês",
+        [("#9333ea", "Turnover voluntário %", 1), ("#9333ea", "Média do período", 0.35)],
     )
 
 chart_card(

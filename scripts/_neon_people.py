@@ -27,15 +27,17 @@ CREATE TABLE IF NOT EXISTS people_rows (
     perm_meses DOUBLE PRECISION,
     setor TEXT,
     gestor TEXT,
-    cargo_gestor TEXT
+    cargo_gestor TEXT,
+    tipo_desligamento TEXT
 )
 """
 
-# Cobre tabelas criadas antes destas 3 colunas existirem (idempotente).
+# Cobre tabelas criadas antes destas colunas existirem (idempotente).
 ALTER_TABLE_SQL = [
     "ALTER TABLE people_rows ADD COLUMN IF NOT EXISTS setor TEXT",
     "ALTER TABLE people_rows ADD COLUMN IF NOT EXISTS gestor TEXT",
     "ALTER TABLE people_rows ADD COLUMN IF NOT EXISTS cargo_gestor TEXT",
+    "ALTER TABLE people_rows ADD COLUMN IF NOT EXISTS tipo_desligamento TEXT",
 ]
 
 # DataFrame column (fonte) -> coluna da tabela. Colunas ausentes na origem
@@ -52,6 +54,7 @@ COLUMN_MAP = {
     "Setor": "setor",
     "Gestor": "gestor",
     "Cargo Gestor": "cargo_gestor",
+    "Tipo Desligamento": "tipo_desligamento",
 }
 
 

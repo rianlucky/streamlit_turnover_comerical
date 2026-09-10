@@ -95,6 +95,24 @@ def turnover_legado(period: pd.DataFrame, media: float) -> go.Figure:
     return fig
 
 
+def desligamentos_por_tipo(period: pd.DataFrame) -> go.Figure:
+    """Barras empilhadas: desligamentos voluntários x involuntários por mês."""
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=period["Mês"], y=period["Desligamentos Voluntários"], name="Voluntário", marker_color="rgba(220,38,38,.65)", marker_cornerradius=4))
+    fig.add_trace(go.Bar(x=period["Mês"], y=period["Desligamentos Involuntários"], name="Involuntário", marker_color="rgba(100,116,139,.65)", marker_cornerradius=4))
+    fig.update_layout(**_base_layout(), barmode="stack", bargap=0.3)
+    return fig
+
+
+def turnover_voluntario(period: pd.DataFrame, media: float) -> go.Figure:
+    x, y = period["Mês"].tolist(), period["Turnover Voluntário (%)"].tolist()
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=x, y=[media] * len(period), name="Média", mode="lines", line={"color": "rgba(147,51,234,.4)", "width": 1.5, "dash": "dash"}, hoverinfo="skip"))
+    fig.add_trace(go.Scatter(x=x, y=y, name="Turnover voluntário", mode="lines+markers", line={"color": "#9333ea", "width": 2.5, "shape": "spline", "smoothing": 0.6}, marker={"size": 6, "color": "#9333ea"}, fill="tozeroy", fillcolor="rgba(147,51,234,.08)"))
+    fig.update_layout(**_base_layout("%", margin={"l": 6, "r": 6, "t": 24, "b": 22}), annotations=_minmax_annotations(x, y, "#9333ea", "%", 1))
+    return fig
+
+
 def comparativo_turnover(period: pd.DataFrame) -> go.Figure:
     """Duas linhas: turnover real (fórmula do Comercial, efetivo médio do mês) vs. a
     variante do D.O. (efetivo do último dia do mês anterior) — mesmo numerador."""
