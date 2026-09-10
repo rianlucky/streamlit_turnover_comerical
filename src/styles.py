@@ -121,7 +121,7 @@ label[data-testid="stWidgetLabel"] p {{
 .pag-info {{ font-size:12px; color:var(--mid); }}
 
 /* ── Tela de login (cartão dividido: marca à esquerda, formulário à direita) ── */
-.st-key-login_page {{ display:flex; flex-direction:column; justify-content:center; min-height:calc(100vh - 130px); }}
+.st-key-login_page {{ margin-top:10vh; }}
 [data-testid="stVerticalBlockBorderWrapper"].st-key-login_card {{
   border:none !important; border-radius:16px; overflow:hidden; padding:0 !important;
   box-shadow:0 14px 40px rgba(17,17,16,.12);
