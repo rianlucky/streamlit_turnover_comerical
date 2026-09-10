@@ -58,7 +58,7 @@ _, default_end_date = month_start_end(last_key)
 st.html('<div class="page-title"><h1>Movimentação de Pessoas</h1><p>Análise de admissões, demissões, turnover e headcount por cidade e cargo</p></div>')
 
 with st.container(border=True):
-    filters = st.columns([1.3, 1.5, 1.5, 2.0])
+    filters = st.columns([1.2, 1.3, 1.3, 1.1, 1.8])
     with filters[0]:
         cidades = st.multiselect("Cidade", source_data["cidades"], placeholder="Global (todas)", format_func=city_label)
     with filters[1]:
@@ -66,6 +66,8 @@ with st.container(border=True):
     with filters[2]:
         gestores = st.multiselect("Gestor", source_data["gestores"], placeholder="Todos")
     with filters[3]:
+        equipes = st.multiselect("Equipe", source_data["equipes"], placeholder="Todas")
+    with filters[4]:
         date_range = st.date_input(
             "Período",
             value=(default_start_date, default_end_date),
@@ -84,7 +86,7 @@ if start > end:
     st.error("O mês inicial precisa ser anterior ou igual ao mês final.")
     st.stop()
 
-series = get_series(source_data, cidades, grupos, gestores)
+series = get_series(source_data, cidades, grupos, gestores, equipes)
 period = select_period(source_data, series, start, end)
 admissions_total, terminations_total = int(period["Admissões"].sum()), int(period["Desligamentos"].sum())
 active_final = int(period["Ativos"].iloc[-1]) if not period.empty else 0
@@ -163,7 +165,7 @@ chart_card(
 # ── Indicadores complementares ────────────────────────────────────────────
 # Usam cidade/cargo/período do filtro atual, mas ignoram o filtro de Status —
 # o objetivo aqui é justamente comparar quem ficou com quem saiu.
-population = filter_people(source_data["rows"], cidades, grupos, gestores, start, end, "", [])
+population = filter_people(source_data["rows"], cidades, grupos, gestores, equipes, start, end, "", [])
 population_days = [humanize_tenure(row["Admissão"], row["Demissão"])[1] for _, row in population.iterrows()]
 population = population.assign(_Dias=population_days)
 dias_ativos = population.loc[population["Status"] == "Ativo", "_Dias"]
@@ -205,9 +207,9 @@ with sort_col_2:
 with status_col:
     status_selected = st.multiselect("Status", STATUS_VALUES, default=["Ativo"], label_visibility="collapsed")
 
-people = filter_people(source_data["rows"], cidades, grupos, gestores, start, end, search, status_selected)
+people = filter_people(source_data["rows"], cidades, grupos, gestores, equipes, start, end, search, status_selected)
 
-filter_signature = (tuple(cidades), tuple(grupos), tuple(gestores), start, end, search, tuple(status_selected))
+filter_signature = (tuple(cidades), tuple(grupos), tuple(gestores), tuple(equipes), start, end, search, tuple(status_selected))
 if st.session_state.get("_filter_signature") != filter_signature:
     st.session_state["_filter_signature"] = filter_signature
     st.session_state["page"] = 1
@@ -222,7 +224,7 @@ sort_column = SORT_COLUMNS[sort_label]
 people = people.sort_values(sort_column, ascending=sort_dir == "Crescente", na_position="last")
 
 with export_col:
-    export_df = people[["Registro", "Nome", "Cargo Atual2", "Cidade", "Gestor", "Status", "Admissão", "Demissão", "TenureText"]].rename(
+    export_df = people[["Registro", "Nome", "Cargo Atual2", "Equipe", "Cidade", "Gestor", "Status", "Admissão", "Demissão", "TenureText"]].rename(
         columns={"Registro": "ID", "Cargo Atual2": "Cargo", "TenureText": "Permanência"}
     )
     excel_buffer = io.BytesIO()

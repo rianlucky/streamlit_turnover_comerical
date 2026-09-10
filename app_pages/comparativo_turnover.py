@@ -36,7 +36,7 @@ if start > end:
     st.error("O mês inicial precisa ser anterior ou igual ao mês final.")
     st.stop()
 
-series = get_series(source_data, [], [], [])
+series = get_series(source_data, [], [], [], [])
 period = select_period(source_data, series, start, end)
 
 st.html(

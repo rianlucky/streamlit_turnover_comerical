@@ -182,6 +182,9 @@ CARGO_GROUP_MAP = {
 }
 CARGO_GROUP_ORDER = ["Auxiliar", "Assistentes", "Analistas", "Analistas Parcerias", "Supervisor", "Coordenador", "Gerente", "Executivos"]
 
+# Equipe: segmento de negócio (separado de Cidade/Grupo) — ver load_source_data().
+EQUIPE_ORDER = ["Vendas UH", "Lotes Comerciais", "Repasses"]
+
 
 def _extract_json(source: str, declaration: str, next_declaration: str) -> Any:
     pattern = rf"const {declaration}\s*=\s*(.*?)\s*;\s*const {next_declaration}"
@@ -235,25 +238,27 @@ def load_source_data() -> dict[str, Any]:
     rows["Grupo"] = rows["Cargo Atual2"].map(CARGO_GROUP_MAP)
 
     # Databricks devolve a cidade em CAIXA ALTA sem acento — normaliza pro nome
-    # "bonito" (usado em CITY_UF/CITY_COORDS e exibido na tela) antes de mais nada,
-    # pra não interferir com a gambiarra de Lotes/Repasses logo abaixo.
+    # "bonito" (usado em CITY_UF/CITY_COORDS e exibido na tela). Cidade sempre é o
+    # local real do colaborador agora — o segmento de negócio (Lotes/Repasses) vive
+    # à parte, no campo Equipe (ver abaixo).
     rows["Cidade"] = rows["Cidade"].map(_display_city)
 
-    # Gambiarra pedida pelo usuário (2026-09-09): Lotes Comerciais e Repasses são
-    # segmentos de negócio, não times ligados a uma cidade específica — a cidade real
-    # do colaborador (via dim_local) não faz sentido pro filtro aqui, então vira o
-    # próprio segmento (mesmo padrão de "Lotes" já usado na base antiga em CITY_UF).
-    rows.loc[rows["Cargo Atual2"].str.contains("Lotes"), "Cidade"] = "Lotes"
-    rows.loc[rows["Cargo Atual2"].str.contains("Repasses"), "Cidade"] = "Repasses"
-    # A base antiga (HTML) já marcava estes 2 Registros como "Lotes" mesmo com cargo/
-    # cidade formal de Vendas — mantém a mesma classificação na base real (Databricks).
+    # Equipe: segmento de negócio, separado de Cidade/Grupo. Regra pedida pelo
+    # usuário (2026-09-10) — default "Vendas UH" pra quem não é Lotes/Repasses.
+    rows["Equipe"] = "Vendas UH"
+    rows.loc[rows["Cargo Atual2"].str.contains("Lotes"), "Equipe"] = "Lotes Comerciais"
+    rows.loc[rows["Cargo Atual2"].str.contains("Repasses"), "Equipe"] = "Repasses"
+    # A base antiga (HTML) já marcava estes 2 Registros como "Lotes" mesmo com cargo
+    # formal de Vendas — mantém a mesma classificação de equipe na base real (Databricks).
     LOTES_REGISTRO_OVERRIDE = {2649, 2505}
-    rows.loc[rows["Registro"].isin(LOTES_REGISTRO_OVERRIDE), "Cidade"] = "Lotes"
+    rows.loc[rows["Registro"].isin(LOTES_REGISTRO_OVERRIDE), "Equipe"] = "Lotes Comerciais"
 
     cidades = sorted(rows["Cidade"].unique())
     grupos_presentes = set(rows["Grupo"])
     grupos = [g for g in CARGO_GROUP_ORDER if g in grupos_presentes] + sorted(grupos_presentes - set(CARGO_GROUP_ORDER))
     gestores = sorted(g for g in rows["Gestor"].dropna().unique() if g)
+    equipes_presentes = set(rows["Equipe"])
+    equipes = [e for e in EQUIPE_ORDER if e in equipes_presentes] + sorted(equipes_presentes - set(EQUIPE_ORDER))
 
     keys, labels = _month_range()
 
@@ -262,6 +267,7 @@ def load_source_data() -> dict[str, Any]:
         "cidades": cidades,
         "grupos": grupos,
         "gestores": gestores,
+        "equipes": equipes,
         "labels": labels,
         "keys": keys,
     }
@@ -332,20 +338,22 @@ def build_monthly_series(rows: pd.DataFrame, keys: list[str]) -> dict[str, list[
     }
 
 
-def filter_cidade_grupo(rows: pd.DataFrame, cidades: list[str], grupos: list[str], gestores: list[str]) -> pd.DataFrame:
-    """Only the Cidade/Grupo/Gestor filters (empty lists = every city/grupo/gestor) — shared by charts, table and indicators."""
+def filter_cidade_grupo(rows: pd.DataFrame, cidades: list[str], grupos: list[str], gestores: list[str], equipes: list[str]) -> pd.DataFrame:
+    """Only the Cidade/Grupo/Gestor/Equipe filters (empty lists = todos) — shared by charts, table and indicators."""
     if cidades:
         rows = rows[rows["Cidade"].isin(cidades)]
     if grupos:
         rows = rows[rows["Grupo"].isin(grupos)]
     if gestores:
         rows = rows[rows["Gestor"].isin(gestores)]
+    if equipes:
+        rows = rows[rows["Equipe"].isin(equipes)]
     return rows
 
 
-def get_series(source_data: dict[str, Any], cidades: list[str], grupos: list[str], gestores: list[str]) -> dict[str, list[float]]:
-    """Monthly series for the selected filters (empty lists = every city/grupo/gestor)."""
-    filtered = filter_cidade_grupo(source_data["rows"], cidades, grupos, gestores)
+def get_series(source_data: dict[str, Any], cidades: list[str], grupos: list[str], gestores: list[str], equipes: list[str]) -> dict[str, list[float]]:
+    """Monthly series for the selected filters (empty lists = todos)."""
+    filtered = filter_cidade_grupo(source_data["rows"], cidades, grupos, gestores, equipes)
     return build_monthly_series(filtered, source_data["keys"])
 
 
@@ -396,8 +404,8 @@ def dimension_ranking(source_data: dict[str, Any], dimension: str, start: str, e
     return pd.DataFrame(records)
 
 
-def filter_people(rows: pd.DataFrame, cidades: list[str], grupos: list[str], gestores: list[str], start: str, end: str, search: str, status_selected: list[str] | None = None) -> pd.DataFrame:
-    filtered = filter_cidade_grupo(rows, cidades, grupos, gestores)
+def filter_people(rows: pd.DataFrame, cidades: list[str], grupos: list[str], gestores: list[str], equipes: list[str], start: str, end: str, search: str, status_selected: list[str] | None = None) -> pd.DataFrame:
+    filtered = filter_cidade_grupo(rows, cidades, grupos, gestores, equipes)
     admissions = filtered["Admissão"].fillna("")
     terminations = filtered["Demissão"].replace("", "2099-12-31").fillna("2099-12-31")
     filtered = filtered[(admissions <= f"{end}-31") & (terminations >= f"{start}-01")]
