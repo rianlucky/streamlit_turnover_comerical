@@ -76,11 +76,20 @@ UNION ALL
 SELECT
   f.descricao_departamento, l.cidade, f.id_funcionario, f.nome_funcionario, f.descricao_cargo,
   COALESCE(f.data_admissao_grupo, f.data_admissao), f.data_desligamento,
-  NULL AS Gestor, NULL AS `Cargo Gestor`,
+  COALESCE(rb1.nome_funcionario, rb2.nome_funcionario, rb3.nome_funcionario, rb4.nome_funcionario, rb5.nome_funcionario) AS Gestor,
+  COALESCE(rb1.descricao_cargo, rb2.descricao_cargo, rb3.descricao_cargo, rb4.descricao_cargo, rb5.descricao_cargo) AS `Cargo Gestor`,
   'Ativo',
   NULL AS `Tipo Desligamento`
 FROM rh.gold.fato_funcionario_inativo f
 LEFT JOIN enterprise.data.dim_local l ON f.descricao_local = l.descricao_local
+LEFT JOIN reportes_breno rb1 ON f.id_funcionario = rb1.id_funcionario
+LEFT JOIN reportes_breno rb2 ON CAST(f.id_gestor AS STRING) = rb2.id_funcionario
+LEFT JOIN hierarquia h2 ON CAST(f.id_gestor AS STRING) = h2.id_funcionario
+LEFT JOIN reportes_breno rb3 ON h2.id_gestor = rb3.id_funcionario
+LEFT JOIN hierarquia h3 ON h2.id_gestor = h3.id_funcionario
+LEFT JOIN reportes_breno rb4 ON h3.id_gestor = rb4.id_funcionario
+LEFT JOIN hierarquia h4 ON h3.id_gestor = h4.id_funcionario
+LEFT JOIN reportes_breno rb5 ON h4.id_gestor = rb5.id_funcionario
 WHERE (f.nome_diretoria = 'Diretoria Comercial'
        OR (f.nome_diretoria IS NULL
            AND (LOWER(f.descricao_departamento) LIKE '%vendas comercial%'
@@ -96,7 +105,8 @@ UNION ALL
 SELECT
   f.descricao_departamento, l.cidade, f.id_funcionario, f.nome_funcionario, f.descricao_cargo,
   COALESCE(f.data_admissao_grupo, f.data_admissao), f.data_desligamento,
-  NULL AS Gestor, NULL AS `Cargo Gestor`,
+  COALESCE(rb1.nome_funcionario, rb2.nome_funcionario, rb3.nome_funcionario, rb4.nome_funcionario, rb5.nome_funcionario) AS Gestor,
+  COALESCE(rb1.descricao_cargo, rb2.descricao_cargo, rb3.descricao_cargo, rb4.descricao_cargo, rb5.descricao_cargo) AS `Cargo Gestor`,
   'Desligado',
   CASE
     WHEN f.acao = 'Pedido de Demissão' THEN 'Voluntário'
@@ -108,6 +118,14 @@ SELECT
   END AS `Tipo Desligamento`
 FROM rh.gold.fato_funcionario_inativo f
 LEFT JOIN enterprise.data.dim_local l ON f.descricao_local = l.descricao_local
+LEFT JOIN reportes_breno rb1 ON f.id_funcionario = rb1.id_funcionario
+LEFT JOIN reportes_breno rb2 ON CAST(f.id_gestor AS STRING) = rb2.id_funcionario
+LEFT JOIN hierarquia h2 ON CAST(f.id_gestor AS STRING) = h2.id_funcionario
+LEFT JOIN reportes_breno rb3 ON h2.id_gestor = rb3.id_funcionario
+LEFT JOIN hierarquia h3 ON h2.id_gestor = h3.id_funcionario
+LEFT JOIN reportes_breno rb4 ON h3.id_gestor = rb4.id_funcionario
+LEFT JOIN hierarquia h4 ON h3.id_gestor = h4.id_funcionario
+LEFT JOIN reportes_breno rb5 ON h4.id_gestor = rb5.id_funcionario
 WHERE (f.nome_diretoria = 'Diretoria Comercial'
        OR (f.nome_diretoria IS NULL
            AND (LOWER(f.descricao_departamento) LIKE '%vendas comercial%'
