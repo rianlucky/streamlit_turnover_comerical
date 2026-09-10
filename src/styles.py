@@ -119,6 +119,35 @@ label[data-testid="stWidgetLabel"] p {{
 .tbl td.perm-ok  {{ color:var(--green); font-weight:500; }}
 
 .pag-info {{ font-size:12px; color:var(--mid); }}
+
+/* ── Tela de login (cartão dividido: marca à esquerda, formulário à direita) ── */
+[data-testid="stVerticalBlockBorderWrapper"].st-key-login_card {{
+  border:none !important; border-radius:16px; overflow:hidden; padding:0 !important;
+  box-shadow:0 14px 40px rgba(17,17,16,.12);
+}}
+.st-key-login_card [data-testid="stHorizontalBlock"] {{ gap:0 !important; }}
+.st-key-login_left {{
+  background:linear-gradient(160deg, var(--teal) 0%, var(--blue) 100%);
+  min-height:460px; height:100%; padding:48px 30px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+}}
+.login-badge {{
+  background:var(--white); border-radius:50%; width:86px; height:86px;
+  display:flex; align-items:center; justify-content:center; margin-bottom:22px;
+  box-shadow:0 6px 18px rgba(0,0,0,.18);
+}}
+.login-badge img {{ width:52px; }}
+.login-brand-title {{ color:var(--white); font-size:21px; font-weight:700; margin:0 0 8px; letter-spacing:-.01em; }}
+.login-brand-sub {{ color:rgba(255,255,255,.85); font-size:12px; line-height:1.65; max-width:200px; margin:0; }}
+.st-key-login_right {{ padding:48px 44px; min-height:460px; height:100%; display:flex; flex-direction:column; justify-content:center; }}
+.login-form-title {{ font-size:18px; font-weight:600; color:var(--ink); margin:0 0 4px; line-height:1.4; }}
+.login-form-sub {{ font-size:12.5px; color:var(--mid); margin:0 0 22px; line-height:1.5; }}
+.st-key-login_right div[data-testid="stButton"] button {{
+  background:linear-gradient(160deg, var(--teal) 0%, var(--blue) 100%) !important; border:none !important;
+  font-weight:600 !important; border-radius:8px !important; padding:10px 0 !important;
+}}
+.st-key-login_right div[data-testid="stButton"] button p {{ color:var(--white) !important; }}
+.st-key-login_right div[data-testid="stButton"] button:hover {{ filter:brightness(1.08); }}
 </style>
 """
 

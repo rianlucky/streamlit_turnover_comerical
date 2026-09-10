@@ -1,4 +1,5 @@
-"""Fluxo de login em duas telas, no mesmo estilo visual do painel.
+"""Fluxo de login em duas telas, num cartão dividido (marca à esquerda, formulário
+à direita — mesmo padrão visual comum em telas de login de mercado).
 
 Tela 1: e-mail.
 Tela 2, conforme o e-mail informado:
@@ -9,84 +10,108 @@ Tela 2, conforme o e-mail informado:
 
 from __future__ import annotations
 
+import base64
+from pathlib import Path
+from typing import Callable
+
 import streamlit as st
 
 from src.auth import SUPPORT_EMAIL, get_user, needs_password_setup, normalize_email, set_initial_password, verify_login
 
-
-def _centered():
-    _, mid, _ = st.columns([1, 1.2, 1])
-    return mid
+_ICON_PATH = Path(__file__).resolve().parent.parent / "assets" / "icons" / "icone-turnover-comercial-transparente.png"
 
 
-def _header(subtitle: str) -> None:
-    st.html(f'<div class="page-title"><h1>Turnover Comercial</h1><p>{subtitle}</p></div>')
+@st.cache_data
+def _icon_b64() -> str:
+    return base64.b64encode(_ICON_PATH.read_bytes()).decode()
+
+
+def _login_shell(title: str, subtitle: str, render_form: Callable[[], None]) -> None:
+    """Cartão de login: painel de marca fixo à esquerda (logo + nome do projeto),
+    título/subtítulo da tela atual + formulário à direita."""
+    _, mid, _ = st.columns([1, 2.3, 1])
+    with mid:
+        with st.container(border=True, key="login_card"):
+            left, right = st.columns([1, 1.25])
+            with left:
+                with st.container(key="login_left"):
+                    st.html(
+                        f'<div class="login-badge"><img src="data:image/png;base64,{_icon_b64()}" /></div>'
+                        '<div class="login-brand-title">Turnover Comercial</div>'
+                        '<p class="login-brand-sub">Movimentação de pessoas, turnover e headcount da área comercial</p>'
+                    )
+            with right:
+                with st.container(key="login_right"):
+                    st.html(f'<div class="login-form-title">{title}</div><p class="login-form-sub">{subtitle}</p>')
+                    render_form()
 
 
 def _screen_email() -> None:
-    _header("Entre com seu e-mail corporativo para acessar o painel")
-    with _centered():
-        with st.container(border=True):
-            email = st.text_input("E-mail")
-            if st.button("Continuar", width="stretch"):
-                email = normalize_email(email)
-                if not email or "@" not in email:
-                    st.error("Informe um e-mail válido.")
-                else:
-                    st.session_state["auth_email"] = email
-                    st.rerun()
+    def form() -> None:
+        email = st.text_input("E-mail", label_visibility="collapsed", placeholder="seu.email@pacaembu.com")
+        if st.button("Continuar", width="stretch"):
+            normalized = normalize_email(email)
+            if not normalized or "@" not in normalized:
+                st.error("Informe um e-mail válido.")
+            else:
+                st.session_state["auth_email"] = normalized
+                st.rerun()
+
+    _login_shell("Entrar", "Digite seu e-mail corporativo para acessar o painel.", form)
 
 
 def _screen_connection_error() -> None:
-    _header("Erro temporário de conexão")
-    with _centered():
-        with st.container(border=True):
-            st.error("Não foi possível conectar ao banco de dados agora. Isso costuma ser passageiro — tente novamente em alguns segundos.")
-            if st.button("Tentar novamente", width="stretch"):
-                st.rerun()
+    def form() -> None:
+        st.error("Não foi possível conectar ao banco de dados agora. Isso costuma ser passageiro — tente novamente em alguns segundos.")
+        if st.button("Tentar novamente", width="stretch"):
+            st.rerun()
+
+    _login_shell("Erro temporário de conexão", "Não conseguimos falar com o banco de dados agora.", form)
 
 
 def _screen_no_access(email: str) -> None:
-    _header("Acesso não encontrado")
-    with _centered():
-        with st.container(border=True):
-            st.warning(f"O e-mail **{email}** ainda não tem acesso a este painel. Solicite a inclusão para **{SUPPORT_EMAIL}**.")
-            if st.button("Tentar outro e-mail", width="stretch"):
-                st.session_state["auth_email"] = None
-                st.rerun()
+    def form() -> None:
+        st.warning(f"O e-mail **{email}** ainda não tem acesso a este painel. Solicite a inclusão para **{SUPPORT_EMAIL}**.")
+        if st.button("Tentar outro e-mail", width="stretch"):
+            st.session_state["auth_email"] = None
+            st.rerun()
+
+    _login_shell("Acesso não encontrado", "Esse e-mail ainda não está liberado.", form)
 
 
 def _screen_set_password(user: dict) -> None:
-    _header(f"Olá, {user.get('name') or user['email']} — este é seu primeiro acesso. Crie uma senha")
-    with _centered():
-        with st.container(border=True):
-            password = st.text_input("Senha", type="password")
-            confirm = st.text_input("Confirmar senha", type="password")
-            if st.button("Criar senha e entrar", width="stretch"):
-                if len(password) < 8:
-                    st.error("A senha precisa ter pelo menos 8 caracteres.")
-                elif password != confirm:
-                    st.error("As senhas não coincidem.")
-                else:
-                    st.session_state["auth_user"] = set_initial_password(user["email"], password)
-                    st.rerun()
+    def form() -> None:
+        password = st.text_input("Senha", type="password", placeholder="Crie uma senha (mín. 8 caracteres)")
+        confirm = st.text_input("Confirmar senha", type="password", placeholder="Digite a senha de novo")
+        if st.button("Criar senha e entrar", width="stretch"):
+            if len(password) < 8:
+                st.error("A senha precisa ter pelo menos 8 caracteres.")
+            elif password != confirm:
+                st.error("As senhas não coincidem.")
+            else:
+                st.session_state["auth_user"] = set_initial_password(user["email"], password)
+                st.rerun()
+
+    name = user.get("name") or user["email"]
+    _login_shell(f"Olá, {name}", "Este é seu primeiro acesso — crie uma senha.", form)
 
 
 def _screen_login(user: dict) -> None:
-    _header(f"Olá, {user.get('name') or user['email']} — digite sua senha")
-    with _centered():
-        with st.container(border=True):
-            password = st.text_input("Senha", type="password")
-            if st.button("Entrar", width="stretch"):
-                verified = verify_login(user["email"], password)
-                if verified:
-                    st.session_state["auth_user"] = verified
-                    st.rerun()
-                else:
-                    st.error("Senha incorreta.")
-            if st.button("Usar outro e-mail", key="switch_email"):
-                st.session_state["auth_email"] = None
+    def form() -> None:
+        password = st.text_input("Senha", type="password", label_visibility="collapsed", placeholder="Digite sua senha")
+        if st.button("Entrar", width="stretch"):
+            verified = verify_login(user["email"], password)
+            if verified:
+                st.session_state["auth_user"] = verified
                 st.rerun()
+            else:
+                st.error("Senha incorreta.")
+        if st.button("Usar outro e-mail", key="switch_email"):
+            st.session_state["auth_email"] = None
+            st.rerun()
+
+    name = user.get("name") or user["email"]
+    _login_shell(f"Olá, {name}", "Digite sua senha para entrar.", form)
 
 
 def require_login() -> None:
