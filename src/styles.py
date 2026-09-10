@@ -133,11 +133,11 @@ label[data-testid="stWidgetLabel"] p {{
   display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
 }}
 .login-logo-pill {{
-  background:var(--white); border-radius:12px; padding:16px 22px;
+  background:var(--white); border-radius:12px; padding:10px 14px;
   display:inline-flex; align-items:center; justify-content:center; margin-bottom:22px;
-  box-shadow:0 6px 18px rgba(0,0,0,.18);
+  box-shadow:0 6px 18px rgba(0,0,0,.18); max-width:100%; box-sizing:border-box;
 }}
-.login-logo-pill img {{ width:190px; height:auto; display:block; }}
+.login-logo-pill img {{ width:140px; max-width:100%; height:auto; display:block; }}
 .login-brand-sub {{ color:rgba(255,255,255,.85); font-size:12px; line-height:1.65; max-width:200px; margin:0; }}
 .st-key-login_right {{ padding:48px 44px; min-height:460px; height:100%; display:flex; flex-direction:column; justify-content:center; }}
 .login-form-title {{ font-size:18px; font-weight:600; color:var(--ink); margin:0 0 4px; line-height:1.4; }}
