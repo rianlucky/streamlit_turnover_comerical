@@ -113,6 +113,24 @@ def turnover_voluntario(period: pd.DataFrame, media: float) -> go.Figure:
     return fig
 
 
+def permanencia_comparativo(dias_ativos: float, dias_desligados: float, label_ativos: str, label_desligados: str) -> go.Figure:
+    """Barra horizontal Ativos × Desligados — reforça visualmente a comparação de
+    permanência média (o mesmo padrão usado em benchmarks de RH de mercado, tempo
+    de casa médio por status), em vez de só os dois números soltos."""
+    fig = go.Figure(go.Bar(
+        x=[dias_ativos, dias_desligados], y=["Ativos", "Desligados"], orientation="h",
+        marker_color=["#2563eb", "#dc2626"], marker_cornerradius=6,
+        text=[label_ativos, label_desligados], textposition="outside", textfont=FONT, cliponaxis=False,
+    ))
+    fig.update_layout(
+        height=130, margin={"l": 6, "r": 60, "t": 6, "b": 6}, showlegend=False,
+        paper_bgcolor="white", plot_bgcolor="white", font=FONT,
+        xaxis={"showgrid": False, "showticklabels": False, "zeroline": False},
+        yaxis={"showgrid": False, "tickfont": FONT},
+    )
+    return fig
+
+
 def ranking_bar(df: pd.DataFrame, label_col: str, value_col: str, color: str, suffix: str = "", decimals: int = 0) -> go.Figure:
     """Barra horizontal — maior valor no topo (Top N já deve vir pronto em `df`)."""
     ordered = df.sort_values(value_col, ascending=True)
@@ -137,10 +155,16 @@ def ranking_bar(df: pd.DataFrame, label_col: str, value_col: str, color: str, su
 
 def concentracao_mapa(data: pd.DataFrame) -> go.Figure:
     """Bolhas por cidade — tamanho proporcional ao headcount ativo (só ativos, ver
-    data_logic.city_concentration). `data` precisa ter Cidade/Ativos/Lat/Lon."""
+    data_logic.city_concentration). `data` precisa ter Cidade/Ativos/Lat/Lon.
+
+    `fitbounds="locations"` sozinho deixava faixas brancas nas laterais do card: o
+    Plotly preserva a proporção real lat/lon do bounding box (mais alto que largo,
+    pelas cidades irem do MT ao PR), então sobrava fundo branco nas bordas de um
+    card mais largo que alto. Em vez disso, define um range manual com mais folga
+    em longitude do que em latitude, pra usar melhor a largura do card."""
     if data.empty:
         fig = go.Figure()
-        fig.update_geos(scope="south america", fitbounds=False, center={"lat": -15, "lon": -55}, projection_scale=3)
+        fig.update_geos(scope="south america", center={"lat": -15, "lon": -55}, projection_scale=3)
     else:
         max_ativos = data["Ativos"].max()
         sizeref = 2 * max_ativos / (42 ** 2) if max_ativos else 1
@@ -150,12 +174,23 @@ def concentracao_mapa(data: pd.DataFrame) -> go.Figure:
             hoverinfo="text",
             marker={
                 "size": data["Ativos"], "sizemode": "area", "sizeref": sizeref, "sizemin": 4,
-                "color": "#2563eb", "opacity": 0.7, "line": {"width": 1, "color": "white"},
+                "color": "#2563eb", "opacity": 0.75, "line": {"width": 1, "color": "white"},
             },
         ))
-        fig.update_geos(scope="south america", fitbounds="locations", visible=False)
-    fig.update_geos(showland=True, landcolor="#f4f4f2", showcountries=True, countrycolor="#c9c9c4", showsubunits=True, subunitcolor="#dcdcd8")
-    fig.update_layout(height=320, margin={"l": 0, "r": 0, "t": 0, "b": 0}, paper_bgcolor="white", showlegend=False)
+        lon_min, lon_max = data["Lon"].min(), data["Lon"].max()
+        lat_min, lat_max = data["Lat"].min(), data["Lat"].max()
+        lon_pad = max((lon_max - lon_min) * 0.4, 3)
+        lat_pad = max((lat_max - lat_min) * 0.12, 1.5)
+        fig.update_geos(
+            scope="south america", visible=False,
+            lonaxis_range=[lon_min - lon_pad, lon_max + lon_pad],
+            lataxis_range=[lat_min - lat_pad, lat_max + lat_pad],
+        )
+    fig.update_geos(
+        showland=True, landcolor="#f4f4f2", showcountries=True, countrycolor="#c9c9c4",
+        showsubunits=True, subunitcolor="#dcdcd8", showocean=True, oceancolor="#eef4fb",
+    )
+    fig.update_layout(height=420, margin={"l": 0, "r": 0, "t": 0, "b": 0}, paper_bgcolor="white", showlegend=False)
     return fig
 
 
