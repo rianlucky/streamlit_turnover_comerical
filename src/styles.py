@@ -121,6 +121,7 @@ label[data-testid="stWidgetLabel"] p {{
 .pag-info {{ font-size:12px; color:var(--mid); }}
 
 /* ── Tela de login (cartão dividido: marca à esquerda, formulário à direita) ── */
+.st-key-login_page {{ display:flex; flex-direction:column; justify-content:center; min-height:calc(100vh - 130px); }}
 [data-testid="stVerticalBlockBorderWrapper"].st-key-login_card {{
   border:none !important; border-radius:16px; overflow:hidden; padding:0 !important;
   box-shadow:0 14px 40px rgba(17,17,16,.12);
@@ -131,13 +132,12 @@ label[data-testid="stWidgetLabel"] p {{
   min-height:460px; height:100%; padding:48px 30px;
   display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
 }}
-.login-badge {{
-  background:var(--white); border-radius:50%; width:86px; height:86px;
-  display:flex; align-items:center; justify-content:center; margin-bottom:22px;
+.login-logo-pill {{
+  background:var(--white); border-radius:12px; padding:16px 22px;
+  display:inline-flex; align-items:center; justify-content:center; margin-bottom:22px;
   box-shadow:0 6px 18px rgba(0,0,0,.18);
 }}
-.login-badge img {{ width:52px; }}
-.login-brand-title {{ color:var(--white); font-size:21px; font-weight:700; margin:0 0 8px; letter-spacing:-.01em; }}
+.login-logo-pill img {{ width:190px; height:auto; display:block; }}
 .login-brand-sub {{ color:rgba(255,255,255,.85); font-size:12px; line-height:1.65; max-width:200px; margin:0; }}
 .st-key-login_right {{ padding:48px 44px; min-height:460px; height:100%; display:flex; flex-direction:column; justify-content:center; }}
 .login-form-title {{ font-size:18px; font-weight:600; color:var(--ink); margin:0 0 4px; line-height:1.4; }}

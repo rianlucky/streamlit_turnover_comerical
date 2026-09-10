@@ -18,32 +18,33 @@ import streamlit as st
 
 from src.auth import SUPPORT_EMAIL, get_user, needs_password_setup, normalize_email, set_initial_password, verify_login
 
-_ICON_PATH = Path(__file__).resolve().parent.parent / "assets" / "icons" / "icone-turnover-comercial-transparente.png"
+_LOGO_PATH = Path(__file__).resolve().parent.parent / "assets" / "icons" / "logo_sidebar.png"
 
 
 @st.cache_data
-def _icon_b64() -> str:
-    return base64.b64encode(_ICON_PATH.read_bytes()).decode()
+def _logo_b64() -> str:
+    return base64.b64encode(_LOGO_PATH.read_bytes()).decode()
 
 
 def _login_shell(title: str, subtitle: str, render_form: Callable[[], None]) -> None:
     """Cartão de login: painel de marca fixo à esquerda (logo + nome do projeto),
-    título/subtítulo da tela atual + formulário à direita."""
-    _, mid, _ = st.columns([1, 2.3, 1])
-    with mid:
-        with st.container(border=True, key="login_card"):
-            left, right = st.columns([1, 1.25])
-            with left:
-                with st.container(key="login_left"):
-                    st.html(
-                        f'<div class="login-badge"><img src="data:image/png;base64,{_icon_b64()}" /></div>'
-                        '<div class="login-brand-title">Turnover Comercial</div>'
-                        '<p class="login-brand-sub">Movimentação de pessoas, turnover e headcount da área comercial</p>'
-                    )
-            with right:
-                with st.container(key="login_right"):
-                    st.html(f'<div class="login-form-title">{title}</div><p class="login-form-sub">{subtitle}</p>')
-                    render_form()
+    título/subtítulo da tela atual + formulário à direita. Envolto num container
+    alto (login_page) que centraliza o cartão verticalmente na tela."""
+    with st.container(key="login_page"):
+        _, mid, _ = st.columns([1, 2.3, 1])
+        with mid:
+            with st.container(border=True, key="login_card"):
+                left, right = st.columns([1, 1.25])
+                with left:
+                    with st.container(key="login_left"):
+                        st.html(
+                            f'<div class="login-logo-pill"><img src="data:image/png;base64,{_logo_b64()}" /></div>'
+                            '<p class="login-brand-sub">Movimentação de pessoas, turnover e headcount da área comercial</p>'
+                        )
+                with right:
+                    with st.container(key="login_right"):
+                        st.html(f'<div class="login-form-title">{title}</div><p class="login-form-sub">{subtitle}</p>')
+                        render_form()
 
 
 def _screen_email() -> None:
