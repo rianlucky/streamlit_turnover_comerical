@@ -113,6 +113,28 @@ def turnover_voluntario(period: pd.DataFrame, media: float) -> go.Figure:
     return fig
 
 
+def ranking_bar(df: pd.DataFrame, label_col: str, value_col: str, color: str, suffix: str = "", decimals: int = 0) -> go.Figure:
+    """Barra horizontal — maior valor no topo (Top N já deve vir pronto em `df`)."""
+    ordered = df.sort_values(value_col, ascending=True)
+    labels, values = ordered[label_col].tolist(), ordered[value_col].tolist()
+
+    def fmt(value: float) -> str:
+        return f"{value:.{decimals}f}{suffix}" if decimals else f"{int(round(value))}{suffix}"
+
+    fig = go.Figure(go.Bar(
+        x=values, y=labels, orientation="h",
+        marker_color=color, marker_cornerradius=4,
+        text=[fmt(v) for v in values], textposition="outside", textfont=FONT, cliponaxis=False,
+    ))
+    fig.update_layout(
+        height=220, margin={"l": 6, "r": 40, "t": 6, "b": 6}, showlegend=False,
+        paper_bgcolor="white", plot_bgcolor="white", font=FONT,
+        xaxis={"showgrid": False, "showticklabels": False, "zeroline": False},
+        yaxis={"showgrid": False, "tickfont": FONT},
+    )
+    return fig
+
+
 def comparativo_turnover(period: pd.DataFrame) -> go.Figure:
     """Duas linhas: turnover real (fórmula do Comercial, efetivo médio do mês) vs. a
     variante do D.O. (efetivo do último dia do mês anterior) — mesmo numerador."""

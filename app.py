@@ -25,6 +25,7 @@ render_sidebar_account()
 
 pages = [
     st.Page("app_pages/dashboard.py", title="Movimentação de Pessoas", icon=":material/groups:", default=True),
+    st.Page("app_pages/ranking.py", title="Ranking", icon=":material/leaderboard:"),
     st.Page("app_pages/comparativo_turnover.py", title="Comparativo Turnover", icon=":material/balance:"),
 ]
 st.navigation(pages).run()

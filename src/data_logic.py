@@ -292,6 +292,26 @@ def select_period(source_data: dict[str, Any], series: dict[str, list[float]], s
     })
 
 
+def dimension_ranking(source_data: dict[str, Any], dimension: str, start: str, end: str) -> pd.DataFrame:
+    """Turnover médio e total de desligamentos no período, por valor de `dimension`
+    ("Cidade", "Grupo" ou "Gestor") — cada valor tratado como um filtro isolado (mesma
+    lógica de build_monthly_series). Usada pela página de Ranking (Top 5)."""
+    rows = source_data["rows"]
+    values = sorted(v for v in rows[dimension].dropna().unique() if v)
+
+    records = []
+    for value in values:
+        subset = rows[rows[dimension] == value]
+        series = build_monthly_series(subset, source_data["keys"])
+        period = select_period(source_data, series, start, end)
+        records.append({
+            dimension: value,
+            "Turnover médio (%)": mean_nonzero(period["Turnover real (%)"]),
+            "Desligamentos": int(period["Desligamentos"].sum()),
+        })
+    return pd.DataFrame(records)
+
+
 def filter_people(rows: pd.DataFrame, cidades: list[str], grupos: list[str], gestores: list[str], start: str, end: str, search: str, status_selected: list[str] | None = None) -> pd.DataFrame:
     filtered = filter_cidade_grupo(rows, cidades, grupos, gestores)
     admissions = filtered["Admissão"].fillna("")
