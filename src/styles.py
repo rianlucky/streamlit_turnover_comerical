@@ -77,12 +77,22 @@ label[data-testid="stWidgetLabel"] p {{
 .leg-item {{ display:flex; align-items:center; gap:5px; font-size:11px; color:var(--mid); }}
 .leg-dot {{ width:10px; height:10px; border-radius:2px; display:inline-block; }}
 
-/* Números de apoio dentro de um chart-card: mesmos cartões .kpi do topo (com borda),
-   mas centralizados como grupo em vez de esticados em grid — para 2 ou 3 itens, não
-   fazem sentido preencher a largura toda como os 6 KPIs principais. */
-.kpi-row-centered {{ display:flex; justify-content:center; gap:16px; flex-wrap:wrap; margin:6px 0 18px; }}
-.kpi-row-centered .kpi {{ flex:0 1 auto; min-width:200px; }}
-.kpi-row-centered .kpi .kv {{ white-space:nowrap; }}
+/* Números de apoio dentro de um chart-card (ex.: Permanência Média) — cartões
+   centralizados como grupo, com fundo levemente colorido e um "dot" de destaque em
+   vez do topo colorido simples dos 6 KPIs principais (esses ficam mais "vivos" por
+   estarem sozinhos, sem gráfico do lado, num espaço menor). */
+.kpi-row-centered {{ display:flex; justify-content:center; align-items:stretch; gap:14px; flex-wrap:wrap; margin:6px 0 4px; }}
+.kpi-row-centered .kpi {{
+  flex:1 1 160px; max-width:220px; border:none; border-radius:10px;
+  display:flex; align-items:center; gap:12px; padding:14px 18px;
+}}
+.kpi-row-centered .kpi::before {{ content:''; width:10px; height:10px; border-radius:50%; flex-shrink:0; }}
+.kpi-row-centered .kpi.blue {{ background:#eff6ff; }} .kpi-row-centered .kpi.blue::before {{ background:var(--blue); }}
+.kpi-row-centered .kpi.red  {{ background:#fef2f2; }} .kpi-row-centered .kpi.red::before  {{ background:var(--red); }}
+.kpi-row-centered .kpi .kv {{ white-space:nowrap; font-size:20px; }}
+
+.stat-insight {{ text-align:center; font-size:12px; color:var(--mid); margin:2px 0 18px; }}
+.stat-insight strong {{ color:var(--ink); font-weight:600; }}
 
 /* ── Tabela analítica ── */
 .table-title {{ font-size:13px; font-weight:600; color:var(--ink); }}

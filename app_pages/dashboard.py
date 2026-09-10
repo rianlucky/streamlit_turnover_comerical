@@ -190,6 +190,11 @@ with indicadores_cols[1]:
             ("red", humanize_days(dias_desligados.mean()) if not dias_desligados.empty else "—", f"Desligados ({len(dias_desligados)})"),
         ]
     )
+    if not dias_ativos.empty and not dias_desligados.empty:
+        delta_dias = dias_ativos.mean() - dias_desligados.mean()
+        if abs(delta_dias) >= 1:
+            quem = "Ativos permanecem" if delta_dias > 0 else "Desligados permaneceram"
+            st.html(f'<div class="stat-insight">{quem} <strong>{humanize_days(abs(delta_dias))}</strong> a mais, em média.</div>')
     card_close()
 
 st.write("")
