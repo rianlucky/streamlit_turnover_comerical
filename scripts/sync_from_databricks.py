@@ -76,11 +76,15 @@ UNION ALL
 SELECT
   f.descricao_departamento, l.cidade, f.id_funcionario, f.nome_funcionario, f.descricao_cargo,
   COALESCE(f.data_admissao_grupo, f.data_admissao), f.data_desligamento,
-  NULL AS Gestor, NULL AS `Cargo Gestor`,
+  d.nome_gestor AS Gestor,
+  d.descricao_reporta_se AS `Cargo Gestor`,
   'Ativo',
   NULL AS `Tipo Desligamento`
 FROM rh.gold.fato_funcionario_inativo f
 LEFT JOIN enterprise.data.dim_local l ON f.descricao_local = l.descricao_local
+LEFT JOIN rh.silver.oracle_hcm_pit_adm_00003_desligados_relatorio d
+  ON f.id_funcionario = d.numero_pessoa
+  AND f.data_desligamento = d.data_desligamento
 WHERE (f.nome_diretoria = 'Diretoria Comercial'
        OR (f.nome_diretoria IS NULL
            AND (LOWER(f.descricao_departamento) LIKE '%vendas comercial%'
@@ -96,18 +100,24 @@ UNION ALL
 SELECT
   f.descricao_departamento, l.cidade, f.id_funcionario, f.nome_funcionario, f.descricao_cargo,
   COALESCE(f.data_admissao_grupo, f.data_admissao), f.data_desligamento,
-  NULL AS Gestor, NULL AS `Cargo Gestor`,
+  d.nome_gestor AS Gestor,
+  d.descricao_reporta_se AS `Cargo Gestor`,
   'Desligado',
-  CASE
-    WHEN f.acao = 'Pedido de Demissão' THEN 'Voluntário'
-    WHEN f.acao IN ('Demissão sem Justa Causa', 'Demissão por Justa Causa',
-                     'Término do Contrato a Termo', 'Morte') THEN 'Involuntário'
-    WHEN f.acao = 'Acordo entre Empregado e Empregador' THEN 'Acordo'
-    WHEN f.acao = 'Transferência Global' THEN 'Transferência'
-    ELSE f.acao
-  END AS `Tipo Desligamento`
+  COALESCE(d.tipo_desligamento,
+    CASE
+      WHEN f.acao = 'Pedido de Demissão' THEN 'Voluntário'
+      WHEN f.acao IN ('Demissão sem Justa Causa', 'Demissão por Justa Causa',
+                       'Término do Contrato a Termo', 'Morte') THEN 'Involuntário'
+      WHEN f.acao = 'Acordo entre Empregado e Empregador' THEN 'Acordo'
+      WHEN f.acao = 'Transferência Global' THEN 'Transferência'
+      ELSE f.acao
+    END
+  ) AS `Tipo Desligamento`
 FROM rh.gold.fato_funcionario_inativo f
 LEFT JOIN enterprise.data.dim_local l ON f.descricao_local = l.descricao_local
+LEFT JOIN rh.silver.oracle_hcm_pit_adm_00003_desligados_relatorio d
+  ON f.id_funcionario = d.numero_pessoa
+  AND f.data_desligamento = d.data_desligamento
 WHERE (f.nome_diretoria = 'Diretoria Comercial'
        OR (f.nome_diretoria IS NULL
            AND (LOWER(f.descricao_departamento) LIKE '%vendas comercial%'

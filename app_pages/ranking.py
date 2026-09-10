@@ -50,11 +50,9 @@ if start > end:
     st.stop()
 
 
-def render_dimension(dimension: str, label: str, caveat: str | None = None) -> None:
+def render_dimension(dimension: str, label: str) -> None:
     st.write("")
     st.html(f'<span class="table-title">{label}</span>')
-    if caveat:
-        st.caption(caveat)
     ranking = dimension_ranking(source_data, dimension, start, end)
     if ranking.empty:
         st.info(f"Sem dados suficientes para o ranking por {label.lower()} no período selecionado.")
@@ -85,7 +83,4 @@ def render_dimension(dimension: str, label: str, caveat: str | None = None) -> N
 
 render_dimension("Cidade", "Cidade")
 render_dimension("Grupo", "Cargo")
-render_dimension(
-    "Gestor", "Gestor",
-    caveat="⚠️ Desligados não têm gestor registrado na base — o turnover aqui reflete só admissões e o headcount de quem continua ativo, não desligamentos.",
-)
+render_dimension("Gestor", "Gestor")
