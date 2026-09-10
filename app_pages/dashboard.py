@@ -34,12 +34,7 @@ SORT_COLUMNS = {
 STATUS_VALUES = ["Ativo", "Desligado"]
 
 
-@st.cache_data(ttl=600)
-def get_data():
-    return load_source_data()
-
-
-source_data = get_data()
+source_data = load_source_data()
 label_by_key = dict(zip(source_data["keys"], source_data["labels"]))
 
 # Padrão: últimos 12 meses contando do último mês com admissão ou desligamento na base
@@ -191,6 +186,13 @@ with indicadores_cols[1]:
         ]
     )
     if not dias_ativos.empty and not dias_desligados.empty:
+        st.plotly_chart(
+            charts.permanencia_comparativo(
+                dias_ativos.mean(), dias_desligados.mean(),
+                humanize_days(dias_ativos.mean()), humanize_days(dias_desligados.mean()),
+            ),
+            width="stretch", config={"displayModeBar": False},
+        )
         delta_dias = dias_ativos.mean() - dias_desligados.mean()
         if abs(delta_dias) >= 1:
             quem = "Ativos permanecem" if delta_dias > 0 else "Desligados permaneceram"
