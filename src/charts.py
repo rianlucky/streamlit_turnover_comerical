@@ -135,6 +135,30 @@ def ranking_bar(df: pd.DataFrame, label_col: str, value_col: str, color: str, su
     return fig
 
 
+def concentracao_mapa(data: pd.DataFrame) -> go.Figure:
+    """Bolhas por cidade — tamanho proporcional ao headcount ativo (só ativos, ver
+    data_logic.city_concentration). `data` precisa ter Cidade/Ativos/Lat/Lon."""
+    if data.empty:
+        fig = go.Figure()
+        fig.update_geos(scope="south america", fitbounds=False, center={"lat": -15, "lon": -55}, projection_scale=3)
+    else:
+        max_ativos = data["Ativos"].max()
+        sizeref = 2 * max_ativos / (42 ** 2) if max_ativos else 1
+        fig = go.Figure(go.Scattergeo(
+            lon=data["Lon"], lat=data["Lat"],
+            text=[f"{cidade}: {ativos} ativo(s)" for cidade, ativos in zip(data["Cidade"], data["Ativos"])],
+            hoverinfo="text",
+            marker={
+                "size": data["Ativos"], "sizemode": "area", "sizeref": sizeref, "sizemin": 4,
+                "color": "#2563eb", "opacity": 0.7, "line": {"width": 1, "color": "white"},
+            },
+        ))
+        fig.update_geos(scope="south america", fitbounds="locations", visible=False)
+    fig.update_geos(showland=True, landcolor="#f4f4f2", showcountries=True, countrycolor="#c9c9c4", showsubunits=True, subunitcolor="#dcdcd8")
+    fig.update_layout(height=320, margin={"l": 0, "r": 0, "t": 0, "b": 0}, paper_bgcolor="white", showlegend=False)
+    return fig
+
+
 def comparativo_turnover(period: pd.DataFrame) -> go.Figure:
     """Duas linhas: turnover real (fórmula do Comercial, efetivo médio do mês) vs. a
     variante do D.O. (efetivo do último dia do mês anterior) — mesmo numerador."""

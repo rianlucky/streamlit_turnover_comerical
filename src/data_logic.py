@@ -27,10 +27,11 @@ def _find_html_source() -> Path:
     return matches[0]
 
 
-# Cidade -> UF. A base local não traz o estado por colaborador, então este mapeamento
-# é inferido manualmente a partir do nome da cidade — vale conferir caso a empresa
-# opere em uma cidade homônima de outro estado. "Lotes" não é uma cidade (é um
-# segmento de negócio) e fica sem UF.
+# Cidade -> UF (chave já em forma "bonita", com acento — ver CITY_RAW_TO_DISPLAY).
+# A base local não traz o estado por colaborador, então este mapeamento é inferido
+# manualmente a partir do nome da cidade — vale conferir caso a empresa opere em uma
+# cidade homônima de outro estado. "Lotes"/"Repasses" não são cidades (são segmentos
+# de negócio) e ficam sem UF.
 CITY_UF = {
     "Arapongas": "PR", "Araraquara": "SP", "Araçatuba": "SP", "Assis": "SP",
     "Assis Chateaubriand": "PR", "Avaré": "SP", "Barretos": "SP", "Bauru": "SP",
@@ -40,16 +41,94 @@ CITY_UF = {
     "Lins": "SP", "Londrina": "PR", "Lucas do Rio Verde": "MT", "Marília": "SP",
     "Nova Marilândia": "MT", "Ourinhos": "SP", "Palotina": "PR", "Paranavaí": "PR",
     "Piratininga": "SP", "Ponta Grossa": "PR", "Presidente Prudente": "SP",
-    "Primavera do Leste": "MT", "Ribeirão Preto": "SP", "Rio Preto": "SP",
+    "Primavera do Leste": "MT", "Ribeirão Preto": "SP", "São José do Rio Preto": "SP",
     "Rondonópolis": "MT", "Sinop": "MT", "Sorriso": "MT", "São Carlos": "SP",
     "Tatuí": "SP", "Taubaté": "SP", "Uberlândia": "MG", "Votuporanga": "SP",
+    "São Paulo": "SP",
 }
+
+# O Databricks devolve a cidade em CAIXA ALTA e sem acento (ex.: "SAO JOSE DO RIO
+# PRETO") — mapeia pro nome "bonito" (usado em CITY_UF/CITY_COORDS e exibido na
+# tela). Cidade fora daqui (não mapeada ainda) cai no fallback _title_case_pt.
+CITY_RAW_TO_DISPLAY = {
+    "ARAPONGAS": "Arapongas", "ARARAQUARA": "Araraquara", "ARACATUBA": "Araçatuba",
+    "ASSIS": "Assis", "ASSIS CHATEAUBRIAND": "Assis Chateaubriand", "AVARE": "Avaré",
+    "BARRETOS": "Barretos", "BAURU": "Bauru", "BOTUCATU": "Botucatu",
+    "BRASILIA": "Brasília", "BALSAMO": "Bálsamo", "CAMPO GRANDE": "Campo Grande",
+    "CAMPO MOURAO": "Campo Mourão", "CATANDUVA": "Catanduva", "CIANORTE": "Cianorte",
+    "CUIABA": "Cuiabá", "DIAMANTINO": "Diamantino", "ITAPETININGA": "Itapetininga",
+    "ITUIUTABA": "Ituiutaba", "LEME": "Leme", "LINS": "Lins", "LONDRINA": "Londrina",
+    "LUCAS DO RIO VERDE": "Lucas do Rio Verde", "MARILIA": "Marília",
+    "NOVA MARILANDIA": "Nova Marilândia", "OURINHOS": "Ourinhos", "PALOTINA": "Palotina",
+    "PARANAVAI": "Paranavaí", "PIRATININGA": "Piratininga", "PONTA GROSSA": "Ponta Grossa",
+    "PRESIDENTE PRUDENTE": "Presidente Prudente", "PRIMAVERA DO LESTE": "Primavera do Leste",
+    "RIBEIRAO PRETO": "Ribeirão Preto", "RONDONOPOLIS": "Rondonópolis", "SINOP": "Sinop",
+    "SORRISO": "Sorriso", "SAO CARLOS": "São Carlos",
+    "SAO JOSE DO RIO PRETO": "São José do Rio Preto", "TATUI": "Tatuí",
+    "TAUBATE": "Taubaté", "UBERLANDIA": "Uberlândia", "VOTUPORANGA": "Votuporanga",
+    "SAO PAULO": "São Paulo",
+}
+
+# Coordenadas aproximadas (centro da cidade) para o mapa de concentração de mão de
+# obra — não precisa de precisão de endereço, só de posicionar a bolha no mapa.
+CITY_COORDS = {
+    "Arapongas": (-23.4192, -51.4256), "Araraquara": (-21.7845, -48.1781),
+    "Araçatuba": (-21.2089, -50.4328), "Assis": (-22.6619, -50.4116),
+    "Assis Chateaubriand": (-24.4102, -53.5405), "Avaré": (-23.0996, -48.9250),
+    "Barretos": (-20.5572, -48.5683), "Bauru": (-22.3246, -49.0871),
+    "Botucatu": (-22.8858, -48.4450), "Brasília": (-15.7939, -47.8828),
+    "Bálsamo": (-20.7364, -49.5872), "Campo Grande": (-20.4697, -54.6201),
+    "Campo Mourão": (-24.0453, -52.3778), "Catanduva": (-21.1377, -48.9728),
+    "Cianorte": (-23.6620, -52.6053), "Cuiabá": (-15.6014, -56.0979),
+    "Diamantino": (-14.4093, -56.4467), "Itapetininga": (-23.5917, -48.0533),
+    "Ituiutaba": (-18.9678, -49.4650), "Leme": (-22.1875, -47.3900),
+    "Lins": (-21.6789, -49.7425), "Londrina": (-23.3103, -51.1628),
+    "Lucas do Rio Verde": (-13.0508, -55.9147), "Marília": (-22.2139, -49.9458),
+    "Nova Marilândia": (-14.4189, -56.9500), "Ourinhos": (-22.9787, -49.8700),
+    "Palotina": (-24.2836, -53.8400), "Paranavaí": (-23.0728, -52.4650),
+    "Piratininga": (-22.4142, -49.1414), "Ponta Grossa": (-25.0916, -50.1668),
+    "Presidente Prudente": (-22.1256, -51.3889), "Primavera do Leste": (-15.5589, -54.2967),
+    "Ribeirão Preto": (-21.1775, -47.8103), "Rondonópolis": (-16.4706, -54.6356),
+    "Sinop": (-11.8642, -55.5028), "Sorriso": (-12.5453, -55.7217),
+    "São Carlos": (-22.0087, -47.8909), "São José do Rio Preto": (-20.8113, -49.3758),
+    "Tatuí": (-23.3553, -47.8567), "Taubaté": (-23.0264, -45.5553),
+    "Uberlândia": (-18.9186, -48.2772), "Votuporanga": (-20.4237, -49.9756),
+    "São Paulo": (-23.5505, -46.6333),
+}
+
+_LOWERCASE_PT_WORDS = {"de", "do", "da", "dos", "das", "e"}
+
+
+def _title_case_pt(value: str) -> str:
+    """Fallback para cidade sem entrada em CITY_RAW_TO_DISPLAY: Title Case simples,
+    mantendo preposições comuns (de/do/da/dos/das/e) em minúsculo. Sem acento — só
+    evita ficar em CAIXA ALTA até alguém adicionar a cidade nova ao mapeamento."""
+    words = value.lower().split(" ")
+    return " ".join(w if w in _LOWERCASE_PT_WORDS else w.capitalize() for w in words)
+
+
+def _display_city(cidade: str) -> str:
+    if not cidade:
+        return cidade
+    return CITY_RAW_TO_DISPLAY.get(cidade, _title_case_pt(cidade))
 
 
 def city_label(cidade: str) -> str:
     """"Cidade/UF" para o dropdown; cidades sem UF mapeada (ex.: "Lotes") aparecem sem sufixo."""
     uf = CITY_UF.get(cidade)
     return f"{cidade}/{uf}" if uf else cidade
+
+
+def city_concentration(rows: pd.DataFrame) -> pd.DataFrame:
+    """Headcount ativo por cidade, com coordenadas — para o mapa de concentração de
+    mão de obra. `rows` já deve vir filtrado (cidade/cargo/gestor/período); ignora
+    "Lotes"/"Repasses" e qualquer cidade sem coordenada conhecida."""
+    ativos = rows[rows["Status"] == "Ativo"]
+    counts = ativos.groupby("Cidade").size().rename("Ativos").reset_index()
+    coords = counts["Cidade"].map(CITY_COORDS)
+    counts["Lat"] = coords.map(lambda c: c[0] if isinstance(c, tuple) else None)
+    counts["Lon"] = coords.map(lambda c: c[1] if isinstance(c, tuple) else None)
+    return counts.dropna(subset=["Lat", "Lon"])
 
 
 # A base tem os mesmos cargos em variações de senioridade (Junior/Pleno/Sênior) — o
@@ -154,6 +233,11 @@ def load_source_data() -> dict[str, Any]:
     rows["Cargo Atual2"] = rows["Cargo Atual2"].map(_normalize_cargo)
     rows = rows[rows["Cargo Atual2"].isin(CARGO_GROUP_MAP)].copy()
     rows["Grupo"] = rows["Cargo Atual2"].map(CARGO_GROUP_MAP)
+
+    # Databricks devolve a cidade em CAIXA ALTA sem acento — normaliza pro nome
+    # "bonito" (usado em CITY_UF/CITY_COORDS e exibido na tela) antes de mais nada,
+    # pra não interferir com a gambiarra de Lotes/Repasses logo abaixo.
+    rows["Cidade"] = rows["Cidade"].map(_display_city)
 
     # Gambiarra pedida pelo usuário (2026-09-09): Lotes Comerciais e Repasses são
     # segmentos de negócio, não times ligados a uma cidade específica — a cidade real

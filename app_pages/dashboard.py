@@ -7,6 +7,7 @@ import streamlit as st
 from src import charts
 from src.components import card_close, card_open, chart_card, kpi_row, render_table, stat_pair
 from src.data_logic import (
+    city_concentration,
     city_label,
     filter_people,
     get_series,
@@ -168,17 +169,26 @@ population = population.assign(_Dias=population_days)
 dias_ativos = population.loc[population["Status"] == "Ativo", "_Dias"]
 dias_desligados = population.loc[population["Status"] != "Ativo", "_Dias"]
 
-card_open(
-    "Permanência Média: Ativos × Desligados",
-    "Tempo de casa médio de quem está ativo comparado a quem foi desligado, dentro do filtro atual de cidade, cargo e período",
-)
-stat_pair(
-    [
-        ("blue", humanize_days(dias_ativos.mean()) if not dias_ativos.empty else "—", f"Ativos ({len(dias_ativos)})"),
-        ("red", humanize_days(dias_desligados.mean()) if not dias_desligados.empty else "—", f"Desligados ({len(dias_desligados)})"),
-    ]
-)
-card_close()
+indicadores_cols = st.columns(2)
+with indicadores_cols[0]:
+    chart_card(
+        charts.concentracao_mapa(city_concentration(population)),
+        "Concentração da Mão de Obra",
+        "Colaboradores ativos por cidade, dentro do filtro atual",
+        [("#2563eb", "Ativos por cidade", 1)],
+    )
+with indicadores_cols[1]:
+    card_open(
+        "Permanência Média: Ativos × Desligados",
+        "Tempo de casa médio de quem está ativo comparado a quem foi desligado, dentro do filtro atual de cidade, cargo e período",
+    )
+    stat_pair(
+        [
+            ("blue", humanize_days(dias_ativos.mean()) if not dias_ativos.empty else "—", f"Ativos ({len(dias_ativos)})"),
+            ("red", humanize_days(dias_desligados.mean()) if not dias_desligados.empty else "—", f"Desligados ({len(dias_desligados)})"),
+        ]
+    )
+    card_close()
 
 st.write("")
 header_left, header_right = st.columns([3, 2])
