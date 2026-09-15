@@ -91,9 +91,11 @@ def _screen_no_access(email: str) -> None:
 
 def _screen_set_password(user: dict) -> None:
     def form() -> None:
-        password = st.text_input("Senha", type="password", placeholder="Crie uma senha (mín. 8 caracteres)")
-        confirm = st.text_input("Confirmar senha", type="password", placeholder="Digite a senha de novo")
-        if st.button("Criar senha e entrar", width="stretch"):
+        with st.form("set_password_form", border=False):
+            password = st.text_input("Senha", type="password", placeholder="Crie uma senha (mín. 8 caracteres)")
+            confirm = st.text_input("Confirmar senha", type="password", placeholder="Digite a senha de novo")
+            submitted = st.form_submit_button("Criar senha e entrar", width="stretch")
+        if submitted:
             if len(password) < 8:
                 st.error("A senha precisa ter pelo menos 8 caracteres.")
             elif password != confirm:
@@ -116,8 +118,10 @@ def _screen_login(user: dict) -> None:
                 st.rerun()
             return
 
-        password = st.text_input("Senha", type="password", label_visibility="collapsed", placeholder="Digite sua senha")
-        if st.button("Entrar", width="stretch"):
+        with st.form("login_password_form", border=False):
+            password = st.text_input("Senha", type="password", label_visibility="collapsed", placeholder="Digite sua senha")
+            submitted = st.form_submit_button("Entrar", width="stretch")
+        if submitted:
             verified = verify_login(user["email"], password)
             if verified:
                 st.session_state["auth_user"] = verified
