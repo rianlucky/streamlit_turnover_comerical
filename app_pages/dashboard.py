@@ -231,8 +231,8 @@ sort_column = SORT_COLUMNS[sort_label]
 people = people.sort_values(sort_column, ascending=sort_dir == "Crescente", na_position="last")
 
 with export_col:
-    export_df = people[["Registro", "Nome", "Cargo Atual2", "Equipe", "Cidade", "Gestor", "Status", "Admissão", "Demissão", "TenureText"]].rename(
-        columns={"Registro": "ID", "Cargo Atual2": "Cargo", "TenureText": "Permanência"}
+    export_df = people[["Registro", "Nome", "Cargo Atual2", "Equipe", "Setor", "Cidade", "Gestor", "Status", "Admissão", "Demissão", "TenureText"]].rename(
+        columns={"Registro": "ID", "Cargo Atual2": "Cargo", "Setor": "Departamento", "TenureText": "Permanência"}
     )
     excel_buffer = io.BytesIO()
     export_df.to_excel(excel_buffer, index=False, sheet_name="Colaboradores", engine="openpyxl")

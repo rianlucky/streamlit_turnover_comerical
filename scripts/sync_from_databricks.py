@@ -15,6 +15,7 @@ Nunca imprime dado de colaborador (nome, cidade, datas) — só contagens.
 
 from __future__ import annotations
 
+import re
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -24,6 +25,22 @@ from databricks import sql
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from _neon_people import SECRETS_PATH, EmptySourceError, load_secrets, replace_people_rows  # noqa: E402
+
+# A descrição do departamento sempre termina com essa etiqueta genérica de equipe
+# (ex.: "Uberlândia (Faz. Campo Alegre 1) - Equipe Vendas Comercial") — tirada do
+# nome porque já repete em quase todo departamento comercial e não ajuda a
+# diferenciar um do outro no relatório.
+_SUFIXO_EQUIPE_VENDAS = re.compile(r"\s*-\s*Equipe(?:\s+de)?\s+Vendas(?:\s+Comercial)?\s*$", re.IGNORECASE)
+
+
+def _formatar_setor(codigo: object, nome: object) -> str:
+    """Monta "<código> - <nome>" (ex.: "48326 - Uberlândia (Faz. Campo Alegre 1)"),
+    tirando o sufixo genérico de equipe do nome antes de juntar com o código."""
+    codigo = "" if pd.isna(codigo) else str(codigo).strip()
+    nome = "" if pd.isna(nome) else _SUFIXO_EQUIPE_VENDAS.sub("", str(nome)).strip()
+    if codigo and nome:
+        return f"{codigo} - {nome}"
+    return codigo or nome
 
 
 def _query(ref_str: str, gestor_referencia: str) -> str:
@@ -41,6 +58,7 @@ hierarquia AS (
 
 SELECT
   f.descricao_departamento AS Setor,
+  f.departamento AS CodDepartamento,
   l.cidade AS Cidade,
   f.id_funcionario AS Registro,
   f.nome_funcionario AS Nome,
@@ -74,7 +92,7 @@ WHERE (f.nome_diretoria = 'Diretoria Comercial'
 UNION ALL
 
 SELECT
-  f.descricao_departamento, l.cidade, f.id_funcionario, f.nome_funcionario, f.descricao_cargo,
+  f.descricao_departamento, f.departamento, l.cidade, f.id_funcionario, f.nome_funcionario, f.descricao_cargo,
   COALESCE(f.data_admissao_grupo, f.data_admissao), f.data_desligamento,
   d.nome_gestor AS Gestor,
   d.descricao_reporta_se AS `Cargo Gestor`,
@@ -98,7 +116,7 @@ WHERE (f.nome_diretoria = 'Diretoria Comercial'
 UNION ALL
 
 SELECT
-  f.descricao_departamento, l.cidade, f.id_funcionario, f.nome_funcionario, f.descricao_cargo,
+  f.descricao_departamento, f.departamento, l.cidade, f.id_funcionario, f.nome_funcionario, f.descricao_cargo,
   COALESCE(f.data_admissao_grupo, f.data_admissao), f.data_desligamento,
   d.nome_gestor AS Gestor,
   d.descricao_reporta_se AS `Cargo Gestor`,
@@ -164,6 +182,7 @@ def main() -> None:
     df = fetch_from_databricks()
     print(f"Query retornou {len(df)} linha(s) do Databricks.")
     df = df.rename(columns={"Cargo Atual": "Cargo Atual2", "Admissao": "Admissão", "Demissao": "Demissão"})
+    df["Setor"] = [_formatar_setor(cod, nome) for cod, nome in zip(df["CodDepartamento"], df["Setor"])]
 
     n_ativos = int((df["Status"] == "Ativo").sum()) if not df.empty else 0
     n_desligados = int((df["Status"] == "Desligado").sum()) if not df.empty else 0

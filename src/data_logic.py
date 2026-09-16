@@ -207,7 +207,8 @@ SELECT
     demissao AS "Demissão",
     status AS "Status",
     gestor AS "Gestor",
-    tipo_desligamento AS "Tipo Desligamento"
+    tipo_desligamento AS "Tipo Desligamento",
+    setor AS "Setor"
 FROM people_rows
 """
 
