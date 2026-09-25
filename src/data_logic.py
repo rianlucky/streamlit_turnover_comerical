@@ -209,7 +209,7 @@ SELECT
     gestor AS "Gestor",
     tipo_desligamento AS "Tipo Desligamento",
     setor AS "Setor"
-FROM people_rows
+FROM turnover.people_rows
 """
 
 
@@ -253,7 +253,7 @@ def _read_synced_at() -> "pd.Timestamp | None":
     estiver vazia — tratado na tela como "sem registro de sincronização"."""
     conn = st.connection("sql")
     try:
-        df = conn.query("SELECT synced_at FROM sync_meta WHERE id = 1", ttl=60)
+        df = conn.query("SELECT synced_at FROM turnover.sync_meta WHERE id = 1", ttl=60)
     except Exception:
         return None
     return None if df.empty else df.iloc[0]["synced_at"]

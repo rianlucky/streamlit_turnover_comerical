@@ -3,7 +3,8 @@ interativo via OAuth (abre o navegador para você logar, sem precisar de
 PAT/token) — e substitui a base inteira em `people_rows` no Neon.
 
 Uso:
-    python scripts/sync_from_databricks.py
+    python scripts/sync_from_databricks.py                   # até o último mês fechado
+    python scripts/sync_from_databricks.py --ref 2026-09-25  # até a data informada
 
 Pré-requisito em `.streamlit/secrets.toml` -> [databricks]:
     server_hostname, http_path (connection details do SQL Warehouse) e
@@ -149,6 +150,19 @@ ORDER BY Status, Setor, Nome
 """
 
 
+def _ref_date_from_args() -> date:
+    """`--ref AAAA-MM-DD` força a data de referência (ex.: incluir o mês corrente,
+    ainda parcial). Sem o argumento, usa o último dia do mês fechado anterior."""
+    if "--ref" in sys.argv:
+        idx = sys.argv.index("--ref")
+        try:
+            return date.fromisoformat(sys.argv[idx + 1])
+        except (IndexError, ValueError):
+            print("Uso: python scripts/sync_from_databricks.py [--ref AAAA-MM-DD]")
+            sys.exit(1)
+    return date.today().replace(day=1) - timedelta(days=1)
+
+
 def fetch_from_databricks() -> pd.DataFrame:
     cfg = load_secrets()["databricks"]
     gestor_referencia = cfg.get("gestor_referencia", "").strip()
@@ -156,9 +170,7 @@ def fetch_from_databricks() -> pd.DataFrame:
         print("Preencha 'gestor_referencia' em .streamlit/secrets.toml -> [databricks].")
         sys.exit(1)
 
-    today = date.today()
-    ref_date = today.replace(day=1) - timedelta(days=1)
-    ref_str = ref_date.strftime("%Y-%m-%d")
+    ref_str = _ref_date_from_args().strftime("%Y-%m-%d")
 
     print(f"Conectando ao Databricks via OAuth (o navegador deve abrir para login)... referência: {ref_str}")
     connection = sql.connect(

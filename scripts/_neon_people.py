@@ -16,7 +16,7 @@ from sqlalchemy import text
 SECRETS_PATH = Path(__file__).resolve().parent.parent / ".streamlit" / "secrets.toml"
 
 CREATE_TABLE_SQL = """
-CREATE TABLE IF NOT EXISTS people_rows (
+CREATE TABLE IF NOT EXISTS turnover.people_rows (
     registro INTEGER PRIMARY KEY,
     nome TEXT NOT NULL,
     cargo_atual2 TEXT NOT NULL,
@@ -36,19 +36,40 @@ CREATE TABLE IF NOT EXISTS people_rows (
 # lateral do app ("dados atualizados em"). Ver OBSOLETO.md pra outros campos
 # gravados mas não lidos — esse aqui é o oposto: só escrito e lido, sem PII.
 CREATE_SYNC_META_SQL = """
-CREATE TABLE IF NOT EXISTS sync_meta (
+CREATE TABLE IF NOT EXISTS turnover.sync_meta (
     id INTEGER PRIMARY KEY DEFAULT 1,
     synced_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT sync_meta_single_row CHECK (id = 1)
 )
 """
 
+# Mantém `sync_meta` correto mesmo quando `people_rows` é editada fora destes
+# scripts (ex.: INSERT/UPDATE direto no SQL Editor do Neon) — sem isso a barra
+# lateral mostraria uma data de sync antiga mesmo com dado novo na tabela.
+CREATE_TOUCH_FUNCTION_SQL = """
+CREATE OR REPLACE FUNCTION turnover.touch_sync_meta() RETURNS trigger
+LANGUAGE plpgsql SET search_path = turnover, pg_temp AS $$
+BEGIN
+    INSERT INTO turnover.sync_meta (id, synced_at) VALUES (1, now())
+    ON CONFLICT (id) DO UPDATE SET synced_at = now();
+    RETURN NULL;
+END;
+$$
+"""
+
+CREATE_TOUCH_TRIGGER_SQL = """
+DROP TRIGGER IF EXISTS trg_people_rows_touch_sync_meta ON turnover.people_rows;
+CREATE TRIGGER trg_people_rows_touch_sync_meta
+AFTER INSERT OR UPDATE OR DELETE OR TRUNCATE ON turnover.people_rows
+FOR EACH STATEMENT EXECUTE FUNCTION turnover.touch_sync_meta()
+"""
+
 # Cobre tabelas criadas antes destas colunas existirem (idempotente).
 ALTER_TABLE_SQL = [
-    "ALTER TABLE people_rows ADD COLUMN IF NOT EXISTS setor TEXT",
-    "ALTER TABLE people_rows ADD COLUMN IF NOT EXISTS gestor TEXT",
-    "ALTER TABLE people_rows ADD COLUMN IF NOT EXISTS cargo_gestor TEXT",
-    "ALTER TABLE people_rows ADD COLUMN IF NOT EXISTS tipo_desligamento TEXT",
+    "ALTER TABLE turnover.people_rows ADD COLUMN IF NOT EXISTS setor TEXT",
+    "ALTER TABLE turnover.people_rows ADD COLUMN IF NOT EXISTS gestor TEXT",
+    "ALTER TABLE turnover.people_rows ADD COLUMN IF NOT EXISTS cargo_gestor TEXT",
+    "ALTER TABLE turnover.people_rows ADD COLUMN IF NOT EXISTS tipo_desligamento TEXT",
 ]
 
 # DataFrame column (fonte) -> coluna da tabela. Colunas ausentes na origem
@@ -74,8 +95,18 @@ def load_secrets() -> dict:
         return tomllib.load(f)
 
 
+def _etl_url(secrets: dict) -> str:
+    """Escrita = usuário de carga `etl_loader` (migração 005), em [etl] url no
+    secrets.toml local. [connections.sql] agora tem o usuário do painel
+    (app_turnover), que só lê. NÃO colar [etl] nos Secrets do Streamlit Cloud."""
+    url = (secrets.get("etl") or {}).get("url")
+    if not url:
+        raise SystemExit("Falta [etl] url (usuário etl_loader) em .streamlit/secrets.toml")
+    return url
+
+
 def engine() -> sqlalchemy.Engine:
-    return sqlalchemy.create_engine(load_secrets()["connections"]["sql"]["url"])
+    return sqlalchemy.create_engine(_etl_url(load_secrets()))
 
 
 class EmptySourceError(RuntimeError):
@@ -124,8 +155,12 @@ def replace_people_rows(df: pd.DataFrame) -> int:
         conn.execute(text(CREATE_TABLE_SQL))
         for stmt in ALTER_TABLE_SQL:
             conn.execute(text(stmt))
-        conn.execute(text("TRUNCATE TABLE people_rows"))
-        df.to_sql("people_rows", conn, if_exists="append", index=False, method="multi", chunksize=200)
+        # sync_meta e o trigger precisam existir ANTES do TRUNCATE, que já dispara
+        # touch_sync_meta() (ver CREATE_TOUCH_TRIGGER_SQL).
         conn.execute(text(CREATE_SYNC_META_SQL))
-        conn.execute(text("INSERT INTO sync_meta (id, synced_at) VALUES (1, now()) ON CONFLICT (id) DO UPDATE SET synced_at = now()"))
+        conn.execute(text(CREATE_TOUCH_FUNCTION_SQL))
+        conn.execute(text(CREATE_TOUCH_TRIGGER_SQL))
+        conn.execute(text("TRUNCATE TABLE turnover.people_rows"))
+        df.to_sql("people_rows", conn, schema="turnover", if_exists="append", index=False, method="multi", chunksize=200)
+        conn.execute(text("INSERT INTO turnover.sync_meta (id, synced_at) VALUES (1, now()) ON CONFLICT (id) DO UPDATE SET synced_at = now()"))
     return len(df)

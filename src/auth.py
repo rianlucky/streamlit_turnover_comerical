@@ -61,10 +61,15 @@ def get_connection():
 @st.cache_resource
 def _ensure_schema() -> None:
     conn = get_connection()
+    # Só cria/ajusta se a tabela não existir: o usuário do app (app_turnover) não
+    # tem CREATE no schema nem é dono da tabela — e o Postgres exige isso até em
+    # "CREATE TABLE IF NOT EXISTS"/"ADD COLUMN IF NOT EXISTS" (migração 005, Neon).
     with conn.session as session:
-        session.execute(text(CREATE_TABLE_SQL))
-        for stmt in ALTER_TABLE_SQL:
-            session.execute(text(stmt))
+        exists = session.execute(text("SELECT to_regclass('public.app_users')")).scalar()
+        if exists is None:
+            session.execute(text(CREATE_TABLE_SQL))
+            for stmt in ALTER_TABLE_SQL:
+                session.execute(text(stmt))
         session.commit()
 
 

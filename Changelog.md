@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.1.0] - 2026-09-25
+
+**Integração à Central de Gente & Dados no Neon — migração 005** (ver
+`00 - Central de Gente & Dados/PLANO_INTEGRACAO_NEON.md` e
+`_neon/migrations/005_turnover_comercial.sql`)
+- `people_rows` e `sync_meta` saem de `public` para o schema **`turnover`**
+  (nomes antigos ficam como views de compatibilidade). O trigger que atualiza
+  "Dados atualizados em" foi recriado em `turnover`, com nomes qualificados.
+- Painel conecta como **`app_turnover`** (só leitura). Scripts de carga e
+  `grant_access.py` usam o novo bloco **`[etl]`** do `secrets.toml` local
+  (usuário `etl_loader`) — `[etl]` nunca vai para os Secrets do Streamlit Cloud.
+- `auth.py` só cria/ajusta `app_users` se ela não existir (o usuário do app não
+  é dono da tabela).
+
+**Sync com data de referência opcional**
+- `scripts/sync_from_databricks.py --ref AAAA-MM-DD` permite incluir o mês
+  corrente (ainda parcial). Sem o argumento, continua usando o último dia do
+  mês fechado anterior.
+
 ## [1.0.0] - 2026-09-10
 
 Fecha a V1: base real do Databricks em produção, filtros/indicadores novos e

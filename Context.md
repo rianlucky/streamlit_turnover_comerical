@@ -1,5 +1,15 @@
 # Contexto do projeto
 
+## Neon: onde fica cada coisa (desde a migração 005, 2026-09-25)
+
+| O quê | Onde | Quem escreve | Quem lê |
+|---|---|---|---|
+| Base de colaboradores (ativos + desligados) | `turnover.people_rows` | `scripts/sync_from_databricks.py` / `load_people_data.py` (`etl_loader`, via `[etl]` do secrets.toml local) | `src/data_logic.py` (`app_turnover`) |
+| "Dados atualizados em" | `turnover.sync_meta` (trigger `turnover.touch_sync_meta`) | automático a cada carga | barra lateral |
+| Login | `public.app_users` | `scripts/grant_access.py` (`etl_loader`) | `src/auth.py` |
+
+`public.people_rows`/`public.sync_meta` agora são **views de compatibilidade** — não escrever nelas. Mudança de estrutura: só via `_neon/migrations/`, testada antes no branch `dev`. Isso resolve o item "Neon compartilhado com outro projeto" do NEXTSTEPS.md: cada painel agora tem schema e usuário próprios.
+
 ## Objetivo
 
 Recriar em Streamlit o dashboard de turnover comercial existente em um painel HTML local, mantendo os cálculos atuais, com fidelidade visual aos gráficos e componentes do painel original, e preparando a arquitetura para uma futura fonte Databricks.

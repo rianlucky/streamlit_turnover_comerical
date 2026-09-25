@@ -39,14 +39,21 @@ REVOKE_SQL = "DELETE FROM app_users WHERE email = :email"
 
 
 def _engine() -> sqlalchemy.Engine:
+    """Usa [etl] url (usuário etl_loader, que administra app_users desde a
+    migração 004). [connections.sql] tem o usuário do painel, que não cria login."""
     with SECRETS_PATH.open("rb") as f:
         secrets = tomllib.load(f)
-    return sqlalchemy.create_engine(secrets["connections"]["sql"]["url"])
+    url = (secrets.get("etl") or {}).get("url")
+    if not url:
+        sys.exit("Falta [etl] url (usuário etl_loader) em .streamlit/secrets.toml")
+    return sqlalchemy.create_engine(url)
 
 
 def grant(engine: sqlalchemy.Engine, email: str, name: str) -> None:
     with engine.begin() as conn:
-        conn.execute(text(CREATE_TABLE_SQL))
+        # etl_loader não tem CREATE em public; a tabela já existe (migrações).
+        if conn.execute(text("SELECT to_regclass('public.app_users')")).scalar() is None:
+            conn.execute(text(CREATE_TABLE_SQL))
         conn.execute(text(GRANT_SQL), {"email": email.strip().lower(), "name": name.strip()})
 
 
