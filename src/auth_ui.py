@@ -17,6 +17,7 @@ from typing import Callable
 import streamlit as st
 
 from src.auth import (
+    pode_abrir_painel,
     SUPPORT_EMAIL,
     get_user,
     is_locked,
@@ -185,3 +186,38 @@ def render_sidebar_account() -> None:
             st.session_state["auth_email"] = None
             st.rerun()
         st.divider()
+
+
+def require_panel_access(painel: str) -> None:
+    """Depois do login: confere na matriz de acessos se o e-mail pode abrir ESTE painel
+    (acesso.v_permissoes, administrada em _neon/acessos/admin_acessos.py). Nega se o banco falhar.
+    Consulta uma vez por sessão."""
+    user = st.session_state.get("auth_user")
+    if not user:
+        return
+    email = user["email"]
+    chave = f"_acesso_{painel}"
+    if st.session_state.get(chave) == email:
+        return
+    try:
+        pode = pode_abrir_painel(email, painel)
+    except Exception:  # noqa: BLE001 — sem conseguir conferir, não libera
+        pode = None
+    if pode:
+        st.session_state[chave] = email
+        return
+
+    def form() -> None:
+        if pode is None:
+            st.error("Não foi possível conferir o seu acesso agora. Tente de novo em alguns segundos.")
+            if st.button("Tentar novamente", width="stretch"):
+                st.rerun()
+        else:
+            st.warning(f"O usuário **{email}** não tem acesso a este painel. Solicite a inclusão para **{SUPPORT_EMAIL}**.")
+        if st.button("Sair", key="sair_sem_acesso", width="stretch"):
+            st.session_state["auth_user"] = None
+            st.session_state["auth_email"] = None
+            st.rerun()
+
+    _login_shell("Sem acesso a este painel", "Seu login está ativo, mas este painel não está liberado para você.", form)
+    st.stop()

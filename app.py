@@ -7,7 +7,7 @@ from pathlib import Path
 import streamlit as st
 
 from src.auth import init_db
-from src.auth_ui import render_sidebar_account, require_login
+from src.auth_ui import render_sidebar_account, require_login, require_panel_access
 from src.components import render_sidebar_status
 from src.styles import inject_css
 
@@ -20,6 +20,7 @@ inject_css()
 
 init_db()
 require_login()
+require_panel_access("turnover_comercial")  # matriz de acessos (acesso.v_permissoes)
 
 st.logo(str(LOGO), icon_image=str(ICON))
 render_sidebar_account()

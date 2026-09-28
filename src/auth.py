@@ -160,3 +160,12 @@ def set_initial_password(email: str, password: str) -> dict | None:
         )
         session.commit()
     return get_user(email)
+
+
+def pode_abrir_painel(email: str, painel: str) -> bool:
+    """Matriz de acessos (migrações 013/014): o e-mail pode abrir este painel? (acesso.v_permissoes)"""
+    df = get_connection().query(
+        "SELECT 1 AS ok FROM acesso.v_permissoes WHERE email = :email AND painel = :painel LIMIT 1",
+        params={"email": normalize_email(email), "painel": painel}, ttl=0,
+    )
+    return not df.empty
