@@ -65,7 +65,7 @@ O refresh da base ainda é manual (rodar `sync_from_databricks.py` de novo quand
 
 O app exige login por e-mail. As credenciais ficam em uma tabela Postgres (Neon) — o sistema de arquivos do Streamlit Community Cloud é efêmero, então não dá pra guardar senha em arquivo local.
 
-Fluxo: a pessoa digita o e-mail; se ele não tiver acesso liberado, o app orienta a solicitar a inclusão a `rian.jesus@pacaembu.com`; se tiver acesso e for o primeiro login, ela cria a própria senha; se já tiver senha, só digita ela.
+Fluxo: a pessoa digita o e-mail; se ele não tiver acesso liberado, o app orienta a solicitar a inclusão ao e-mail de suporte (Secrets `[app] email_suporte`); se tiver acesso e for o primeiro login, ela cria a própria senha; se já tiver senha, só digita ela.
 
 Depois de 5 tentativas de senha erradas seguidas, a conta fica bloqueada por 15 minutos (mitigação simples de força bruta, sem serviço externo — `src/auth.py`).
 

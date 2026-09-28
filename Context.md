@@ -6,7 +6,7 @@
 |---|---|---|---|
 | Base de colaboradores (ativos + desligados) | `turnover.people_rows` | `scripts/sync_from_databricks.py` / `load_people_data.py` (`etl_loader`, via `[etl]` do secrets.toml local) | `src/data_logic.py` (`app_turnover`) |
 | "Dados atualizados em" | `turnover.sync_meta` (trigger `turnover.touch_sync_meta`) | automático a cada carga | barra lateral |
-| Login | `public.app_users` | `scripts/grant_access.py` (`etl_loader`) | `src/auth.py` |
+| Login | `public.app_users` | `_neon/acessos/admin_acessos.py` (ferramenta local) | `src/auth.py` |
 
 `public.people_rows`/`public.sync_meta` agora são **views de compatibilidade** — não escrever nelas. Mudança de estrutura: só via `_neon/migrations/`, testada antes no branch `dev`. Isso resolve o item "Neon compartilhado com outro projeto" do NEXTSTEPS.md: cada painel agora tem schema e usuário próprios.
 
@@ -18,7 +18,7 @@ Recriar em Streamlit o dashboard de turnover comercial existente em um painel HT
 
 - `app.py` é um roteador fino (autenticação + `st.navigation`/`st.Page`) com 3 páginas: `app_pages/dashboard.py` (Movimentação de Pessoas), `app_pages/ranking.py` (Top 5 por Cidade/Cargo/Gestor) e `app_pages/comparativo_turnover.py` (fórmula Comercial × D.O.).
 - Barra lateral: logo do projeto, ícones Material Symbols por página, saudação "Olá, {nome}" + botão Sair, e um rodapé cinza (`render_sidebar_status()`) com a data da última sincronização e contadores de cargo/cidade fora do mapeamento.
-- Código organizado em módulos (`src/data_logic.py`, `src/charts.py`, `src/components.py`, `src/styles.py`, `src/auth.py`, `src/auth_ui.py`) + scripts de carga (`scripts/_neon_people.py`, `load_people_data.py`, `sync_from_databricks.py`, `test_databricks.py`, `grant_access.py`).
+- Código organizado em módulos (`src/data_logic.py`, `src/charts.py`, `src/components.py`, `src/styles.py`, `src/auth.py`, `src/auth_ui.py`) + scripts de carga (`scripts/_neon_people.py`, `load_people_data.py`, `sync_from_databricks.py`, `test_databricks.py`); cadastro de acessos pela ferramenta local `_neon/acessos/admin_acessos.py`.
 - **Dados vêm do Databricks** (via `scripts/sync_from_databricks.py`, OAuth U2M manual) carregados na tabela `people_rows` do Neon — não mais do HTML local (isso mudou nas versões 0.8.x, ver Changelog). O HTML local só serve de bootstrap inicial (`load_people_data.py`, sem `--csv`).
 - Filtros: Cidade (multiseleção, "Cidade/UF"), Cargo (grupo agregado), Gestor, Equipe (Vendas UH/Lotes Comerciais/Repasses) e Período (`st.date_input`, calendário único). Status (Ativo/Desligado, padrão Ativo) fica junto da tabela.
 - Período padrão: últimos 12 meses a partir do último mês com dado (`last_active_month`).
@@ -30,7 +30,7 @@ Recriar em Streamlit o dashboard de turnover comercial existente em um painel HT
 ## Login e infraestrutura (2026-09-08)
 
 - Repositório GitHub (`rianlucky/streamlit_turnover_comerical`) vai ficar **público** — a pedido do usuário. Antes disso, removi o HTML local com dado real de 596 colaboradores do rastreamento do git **e reescrevi o único commit existente** (amend + `push --force-with-lease`) pra ele não aparecer nem no histórico. O arquivo continua no disco local — só não vai mais pro GitHub. Conferi o resto do código/docs em busca de nomes/dados reais vazados: nada além desse arquivo. O caminho/nome do arquivo também não fica mais hardcoded em lugar nenhum do repositório (`data_logic._find_html_source()` acha qualquer `.html` dentro de `assets/`).
-- Login por e-mail implementado (`src/auth.py`, `src/auth_ui.py`), persistido no Neon: tela 1 pede e-mail; tela 2 mostra um de três casos (sem acesso -> pede pra solicitar a `rian.jesus@pacaembu.com`; acesso liberado sem senha ainda -> cria senha; acesso com senha -> loga). O DO concede acesso só inserindo o e-mail (`scripts/grant_access.py`), sem definir senha nenhuma — quem cria a senha é a própria pessoa, no primeiro login.
+- Login por e-mail implementado (`src/auth.py`, `src/auth_ui.py`), persistido no Neon: tela 1 pede e-mail; tela 2 mostra um de três casos (sem acesso -> pede pra solicitar ao e-mail de suporte (Secrets `[app] email_suporte`); acesso liberado sem senha ainda -> cria senha; acesso com senha -> loga). O DO concede acesso só inserindo o e-mail (ferramenta local de acessos), sem definir senha nenhuma — quem cria a senha é a própria pessoa, no primeiro login.
 - Considerado (e descartado por ora) usar Microsoft Entra ID (`st.login`) pra SSO corporativo — mais robusto, mas depende de um App registration no Azure AD que o TI ainda não tem disponível. Fica como possível evolução futura; a lógica de "logado ou não" está isolada em `auth_ui.require_login()`, então dá pra trocar sem reescrever o resto do app.
 
 ## Fonte de dados: HTML local -> Neon (2026-09-09)

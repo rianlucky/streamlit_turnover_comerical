@@ -18,7 +18,7 @@ import streamlit as st
 
 from src.auth import (
     pode_abrir_painel,
-    SUPPORT_EMAIL,
+    support_email,
     get_user,
     is_locked,
     lock_remaining_minutes,
@@ -82,7 +82,7 @@ def _screen_connection_error() -> None:
 
 def _screen_no_access(email: str) -> None:
     def form() -> None:
-        st.warning(f"O e-mail **{email}** ainda não tem acesso a este painel. Solicite a inclusão para **{SUPPORT_EMAIL}**.")
+        st.warning(f"O e-mail **{email}** ainda não tem acesso a este painel. Solicite a inclusão para **{support_email()}**.")
         if st.button("Tentar outro e-mail", width="stretch"):
             st.session_state["auth_email"] = None
             st.rerun()
@@ -213,7 +213,7 @@ def require_panel_access(painel: str) -> None:
             if st.button("Tentar novamente", width="stretch"):
                 st.rerun()
         else:
-            st.warning(f"O usuário **{email}** não tem acesso a este painel. Solicite a inclusão para **{SUPPORT_EMAIL}**.")
+            st.warning(f"O usuário **{email}** não tem acesso a este painel. Solicite a inclusão para **{support_email()}**.")
         if st.button("Sair", key="sair_sem_acesso", width="stretch"):
             st.session_state["auth_user"] = None
             st.session_state["auth_email"] = None

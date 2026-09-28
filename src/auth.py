@@ -18,7 +18,14 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import text
 
-SUPPORT_EMAIL = "rian.jesus@pacaembu.com"
+def support_email() -> str:
+    """E-mail para pedir acesso: vem dos Secrets ([app] email_suporte), nunca do código —
+    o repositório é público."""
+    import streamlit as st
+    try:
+        return st.secrets["app"]["email_suporte"]
+    except Exception:  # noqa: BLE001
+        return "o time de People Analytics"
 
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15

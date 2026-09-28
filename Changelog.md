@@ -118,7 +118,7 @@ version a versão.
 
 ## [0.5.0] - 2026-09-08
 
-- Adicionado login por e-mail (`src/auth.py`, `src/auth_ui.py`): tela 1 pede o e-mail; tela 2 mostra um de três casos — (a) sem acesso cadastrado → orienta a solicitar inclusão a `rian.jesus@pacaembu.com`; (b) acesso cadastrado e primeiro login → pede para criar e confirmar uma senha; (c) acesso cadastrado e senha já definida → pede a senha.
+- Adicionado login por e-mail (`src/auth.py`, `src/auth_ui.py`): tela 1 pede o e-mail; tela 2 mostra um de três casos — (a) sem acesso cadastrado → orienta a solicitar inclusão ao e-mail de suporte; (b) acesso cadastrado e primeiro login → pede para criar e confirmar uma senha; (c) acesso cadastrado e senha já definida → pede a senha.
 - O DO concede acesso só inserindo o e-mail (sem senha) — cada pessoa define a própria senha no primeiro login.
 - Credenciais persistidas em Postgres (Neon), via `st.connection("sql")` — necessário porque o sistema de arquivos do Streamlit Community Cloud é efêmero (some em reboot/redeploy), então não dá pra guardar senha em arquivo local.
 - Senhas com hash `bcrypt` (nunca armazenadas em texto puro).
