@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pandas as pd
 import plotly.graph_objects as go
+import pydeck as pdk
 
 GRID = "#f0f0ee"
 FONT = {"family": "DM Sans, sans-serif", "size": 10, "color": "#6b6b68"}
@@ -153,45 +154,27 @@ def ranking_bar(df: pd.DataFrame, label_col: str, value_col: str, color: str, su
     return fig
 
 
-def concentracao_mapa(data: pd.DataFrame) -> go.Figure:
-    """Bolhas por cidade — tamanho proporcional ao headcount ativo (só ativos, ver
-    data_logic.city_concentration). `data` precisa ter Cidade/Ativos/Lat/Lon.
-
-    `fitbounds="locations"` sozinho deixava faixas brancas nas laterais do card: o
-    Plotly preserva a proporção real lat/lon do bounding box (mais alto que largo,
-    pelas cidades irem do MT ao PR), então sobrava fundo branco nas bordas de um
-    card mais largo que alto. Em vez disso, define um range manual com mais folga
-    em longitude do que em latitude, pra usar melhor a largura do card."""
-    if data.empty:
-        fig = go.Figure()
-        fig.update_geos(scope="south america", center={"lat": -15, "lon": -55}, projection_scale=3)
+def concentracao_mapa(data: pd.DataFrame) -> pdk.Deck:
+    """Bolhas por cidade sobre o mapa claro da Carto (mesmo mapa do Headcount Total): raio
+    proporcional à raiz do headcount ativo, semitransparentes com borda (dá para ler o mapa e
+    as bolhas vizinhas através delas). Tooltip com cidade/UF, ativos e desligados no período."""
+    d = data.assign(raio=(data["Ativos"] ** .5) * 9000,
+                    ativos_txt=[f"{v:,}".replace(",", ".") for v in data["Ativos"]],
+                    desl_txt=[f"{v:,}".replace(",", ".") for v in data.get("Desligados", pd.Series(0, index=data.index))])
+    camada = pdk.Layer("ScatterplotLayer", data=d, get_position="[Lon, Lat]", get_radius="raio",
+                       get_fill_color=[37, 99, 235, 110], get_line_color=[37, 99, 235, 230], line_width_min_pixels=1.2,
+                       stroked=True, pickable=True)
+    if d.empty:
+        vista = pdk.ViewState(latitude=-18.5, longitude=-52.5, zoom=4.2)
     else:
-        max_ativos = data["Ativos"].max()
-        sizeref = 2 * max_ativos / (42 ** 2) if max_ativos else 1
-        fig = go.Figure(go.Scattergeo(
-            lon=data["Lon"], lat=data["Lat"],
-            text=[f"{cidade}: {ativos} ativo(s)" for cidade, ativos in zip(data["Cidade"], data["Ativos"])],
-            hoverinfo="text",
-            marker={
-                "size": data["Ativos"], "sizemode": "area", "sizeref": sizeref, "sizemin": 4,
-                "color": "#2563eb", "opacity": 0.75, "line": {"width": 1, "color": "white"},
-            },
-        ))
-        lon_min, lon_max = data["Lon"].min(), data["Lon"].max()
-        lat_min, lat_max = data["Lat"].min(), data["Lat"].max()
-        lon_pad = max((lon_max - lon_min) * 0.4, 3)
-        lat_pad = max((lat_max - lat_min) * 0.12, 1.5)
-        fig.update_geos(
-            scope="south america", visible=False,
-            lonaxis_range=[lon_min - lon_pad, lon_max + lon_pad],
-            lataxis_range=[lat_min - lat_pad, lat_max + lat_pad],
-        )
-    fig.update_geos(
-        showland=True, landcolor="#f4f4f2", showcountries=True, countrycolor="#c9c9c4",
-        showsubunits=True, subunitcolor="#dcdcd8", showocean=True, oceancolor="#eef4fb",
-    )
-    fig.update_layout(height=420, margin={"l": 0, "r": 0, "t": 0, "b": 0}, paper_bgcolor="white", showlegend=False)
-    return fig
+        # enquadra todas as cidades do filtro (com folga para as bolhas das bordas)
+        vista = pdk.data_utils.compute_view(d[["Lon", "Lat"]].values.tolist(), view_proportion=1)
+        vista.latitude = float((d["Lat"].min() + d["Lat"].max()) / 2)
+        vista.longitude = float((d["Lon"].min() + d["Lon"].max()) / 2)
+        vista.zoom = min(max(float(vista.zoom) + 0.15, 3.5), 8) if len(d) > 1 else 7
+    return pdk.Deck(layers=[camada], initial_view_state=vista, map_provider="carto", map_style="light",
+                    tooltip={"html": "<b>{Rotulo}</b><br/>Ativos: {ativos_txt}<br/>Desligados no período: {desl_txt}",
+                             "style": {"backgroundColor": "#1e293b", "color": "#ffffff", "fontSize": "12px"}})
 
 
 def comparativo_turnover(period: pd.DataFrame) -> go.Figure:

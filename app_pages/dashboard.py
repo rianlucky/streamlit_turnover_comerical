@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 import io
 
 import streamlit as st
 
 from src import charts
-from src.components import card_close, card_open, chart_card, kpi_row, render_table, stat_pair
+from src.components import card_close, card_open, chart_card, kpi_row, map_card, render_table, stat_pair
 from src.data_logic import (
     city_concentration,
     city_label,
@@ -168,11 +169,13 @@ dias_desligados = population.loc[population["Status"] != "Ativo", "_Dias"]
 
 indicadores_cols = st.columns(2)
 with indicadores_cols[0]:
-    chart_card(
-        charts.concentracao_mapa(city_concentration(population)),
+    concentracao = city_concentration(population, start, end)
+    map_card(
+        charts.concentracao_mapa(concentracao),
         "Concentração da Mão de Obra",
-        "Colaboradores ativos por cidade, dentro do filtro atual",
-        [("#2563eb", "Ativos por cidade", 1)],
+        "Colaboradores ativos por cidade, dentro do filtro atual — passe o mouse numa bolha para ver os números",
+        [("#2563eb", "Ativos por cidade (tamanho da bolha)", 0.75)],
+        key="mapa-" + hashlib.md5(concentracao[["Cidade", "Ativos", "Desligados"]].to_json().encode()).hexdigest(),
     )
 with indicadores_cols[1]:
     card_open(

@@ -120,12 +120,18 @@ def city_label(cidade: str) -> str:
     return f"{cidade}/{uf}" if uf else cidade
 
 
-def city_concentration(rows: pd.DataFrame) -> pd.DataFrame:
+def city_concentration(rows: pd.DataFrame, start: str | None = None, end: str | None = None) -> pd.DataFrame:
     """Headcount ativo por cidade, com coordenadas — para o mapa de concentração de
-    mão de obra. `rows` já deve vir filtrado (cidade/cargo/gestor/período); ignora
-    "Lotes"/"Repasses" e qualquer cidade sem coordenada conhecida."""
+    mão de obra — e, para o tooltip, os desligamentos no período (`start`/`end` em AAAA-MM).
+    `rows` já deve vir filtrado (cidade/cargo/gestor/período); ignora qualquer cidade sem
+    coordenada conhecida."""
     ativos = rows[rows["Status"] == "Ativo"]
     counts = ativos.groupby("Cidade").size().rename("Ativos").reset_index()
+    demissao = rows["Demissão"].fillna("")
+    no_periodo = (demissao != "") & (demissao >= f"{start or '0000-00'}-01") & (demissao <= f"{end or '9999-12'}-31")
+    desligados = rows[no_periodo].groupby("Cidade").size()
+    counts["Desligados"] = counts["Cidade"].map(desligados).fillna(0).astype(int)
+    counts["Rotulo"] = counts["Cidade"].map(city_label)
     coords = counts["Cidade"].map(CITY_COORDS)
     counts["Lat"] = coords.map(lambda c: c[0] if isinstance(c, tuple) else None)
     counts["Lon"] = coords.map(lambda c: c[1] if isinstance(c, tuple) else None)
@@ -198,23 +204,28 @@ def _grupo_por_nivel(cargo: str) -> str:
 
 # Equipe: segmento de negócio (separado de Cidade/Grupo) — ver load_source_data(). As três
 # primeiras vêm do cargo de vendas; as demais, das outras áreas da Diretoria Comercial.
-EQUIPE_ORDER = ["Vendas UH", "Lotes Comerciais", "Repasses", "Gerência Comercial", "Marketing e Relacionamento",
-                "Financeiro Comercial", "Trade e Lojas", "Performance Comercial", "Apoio às Vendas"]
+EQUIPE_ORDER = ["Vendas UH", "Lotes Comerciais", "Repasses", "Marketing", "Relacionamento com Cliente", "Financeiro Comercial",
+                "Trade", "Performance Comercial", "Apoio às Vendas", "Gerência Comercial"]
+
+# "Gerência Comercial" é uma opção COMPLEMENTAR do filtro Equipe: reúne a liderança (gerentes,
+# executivos e diretor) de todas as equipes, sem tirá-los da equipe de origem.
+GERENCIA_COMERCIAL = "Gerência Comercial"
+_CARGOS_LIDERANCA = ("Gerente", "Executivo", "Executiva", "Diretor", "Diretora")
 
 # Área oficial (mapeamento da Central) -> Equipe, para quem não é cargo de vendas/repasses.
 # As áreas "Vendas (região)" juntam os CCs das lojas: quem está lá sem cargo de vendas e sem
 # palavra-chave abaixo (ex.: motorista, manutenção) fica em "Apoio às Vendas".
 _EQUIPE_POR_AREA = {
-    "Marketing, Comunicação Interna e Relacionamento com Cliente": "Marketing e Relacionamento",
+    "Marketing, Comunicação Interna e Relacionamento com Cliente": "Marketing",
     "Financeiro Comercial": "Financeiro Comercial", "Performance Comercial": "Performance Comercial",
     "Gerência Comercial": "Gerência Comercial", "Repasses": "Repasses", "Lotes Comerciais": "Lotes Comerciais",
 }
 # Palavra no cargo -> Equipe (vale antes da área: o financeiro comercial e o trade ficam nos CCs das lojas)
 _EQUIPE_POR_CARGO = [
     ("financeiro comercial", "Financeiro Comercial"),
-    ("marketing", "Marketing e Relacionamento"), ("comunicação", "Marketing e Relacionamento"),
-    ("relacionamento", "Marketing e Relacionamento"), ("áudio visual", "Marketing e Relacionamento"),
-    ("trade", "Trade e Lojas"), ("infraestrutura de lojas", "Trade e Lojas"),
+    ("relacionamento", "Relacionamento com Cliente"),
+    ("marketing", "Marketing"), ("comunicação", "Marketing"), ("áudio visual", "Marketing"),
+    ("infraestrutura de lojas", "Financeiro Comercial"), ("analista de manutenção", "Financeiro Comercial"), ("trade", "Trade"),
     ("performance", "Performance Comercial"), ("estratégico", "Performance Comercial"),
     ("inteligência de dados", "Performance Comercial"),
 ]
@@ -226,6 +237,43 @@ def _equipe_outras_areas(cargo: str, area: str | None) -> str:
         if chave in c:
             return equipe
     return _EQUIPE_POR_AREA.get(area or "", "Apoio às Vendas")
+
+
+# Gestor (29/09/2026): o filtro só tem Gerentes e Executivos. No sync, o Gestor de quem está
+# ativo é a pessoa do 1º nível abaixo do diretor na cadeia; o de quem saiu é o gestor imediato
+# na saída. Aqui sobe a cadeia (pelo nome do gestor, na própria base) até achar um Gerente ou
+# Executivo; se a cadeia chega ao diretor sem passar por um deles, "Sem Gerência Imediata".
+SEM_GERENCIA = "Sem Gerência Imediata"
+_CARGOS_GESTAO = ("Gerente", "Executivo", "Executiva")
+_CARGOS_DIRECAO = ("Diretor", "Diretora", "Presidente")
+
+
+def _resolver_gestores(rows: pd.DataFrame) -> pd.Series:
+    def cargo(c) -> str:
+        return c.strip() if isinstance(c, str) else ""
+
+    # nome -> (gestor, cargo do gestor, é do 1º nível abaixo do diretor?) — ativo tem prioridade
+    por_nome: dict[str, tuple] = {}
+    ordem = rows.assign(_ativo=rows["Status"] == "Ativo").sort_values(["_ativo", "Demissão"])
+    for nome, g, c, ativo in zip(ordem["Nome"], ordem["Gestor"], ordem["Cargo Gestor"], ordem["_ativo"]):
+        por_nome[nome] = (g, cargo(c), bool(ativo))
+
+    def resolver(g, c, primeiro_nivel: bool):
+        for _ in range(6):
+            if not isinstance(g, str) or not g.strip():
+                return None
+            if c.startswith(_CARGOS_GESTAO):
+                return g
+            if c.startswith(_CARGOS_DIRECAO) or primeiro_nivel:
+                return SEM_GERENCIA
+            proximo = por_nome.get(g)
+            if proximo is None or proximo[0] == g:
+                return None
+            g, c, primeiro_nivel = proximo
+        return None
+
+    return pd.Series([resolver(g, cargo(c), st_ == "Ativo") for g, c, st_ in zip(rows["Gestor"], rows["Cargo Gestor"], rows["Status"])],
+                     index=rows.index, dtype="object")
 
 
 def _extract_json(source: str, declaration: str, next_declaration: str) -> Any:
@@ -248,6 +296,7 @@ SELECT
     demissao AS "Demissão",
     status AS "Status",
     gestor AS "Gestor",
+    cargo_gestor AS "Cargo Gestor",
     tipo_desligamento AS "Tipo Desligamento",
     setor AS "Setor",
     area AS "Area"
@@ -331,6 +380,7 @@ def load_source_data() -> dict[str, Any]:
     # Demais áreas da Diretoria Comercial (29/09/2026): cargo fora dos de vendas/repasses.
     outras = ~rows["Cargo Atual2"].isin(CARGO_GROUP_MAP)
     rows.loc[outras, "Equipe"] = [_equipe_outras_areas(c, a) for c, a in zip(rows.loc[outras, "Cargo Atual2"], rows.loc[outras, "Area"])]
+    rows["Lideranca"] = rows["Cargo Atual2"].str.startswith(_CARGOS_LIDERANCA)
     # A base antiga (HTML) já marcava estes 2 Registros como "Lotes" mesmo com cargo
     # formal de Vendas — mantém a mesma classificação de equipe na base real (Databricks).
     LOTES_REGISTRO_OVERRIDE = {2649, 2505}
@@ -339,8 +389,13 @@ def load_source_data() -> dict[str, Any]:
     cidades = sorted(rows["Cidade"].unique())
     grupos_presentes = set(rows["Grupo"])
     grupos = [g for g in CARGO_GROUP_ORDER if g in grupos_presentes] + sorted(grupos_presentes - set(CARGO_GROUP_ORDER))
-    gestores = sorted(g for g in rows["Gestor"].dropna().unique() if g)
+    rows["Gestor"] = _resolver_gestores(rows)
+    gestores = sorted(g for g in rows["Gestor"].dropna().unique() if g and g != SEM_GERENCIA)
+    if (rows["Gestor"] == SEM_GERENCIA).any():
+        gestores.append(SEM_GERENCIA)
     equipes_presentes = set(rows["Equipe"])
+    if rows["Lideranca"].any():
+        equipes_presentes.add(GERENCIA_COMERCIAL)
     equipes = [e for e in EQUIPE_ORDER if e in equipes_presentes] + sorted(equipes_presentes - set(EQUIPE_ORDER))
 
     keys, labels = _month_range()
@@ -433,7 +488,10 @@ def filter_cidade_grupo(rows: pd.DataFrame, cidades: list[str], grupos: list[str
     if gestores:
         rows = rows[rows["Gestor"].isin(gestores)]
     if equipes:
-        rows = rows[rows["Equipe"].isin(equipes)]
+        marca = rows["Equipe"].isin(equipes)
+        if GERENCIA_COMERCIAL in equipes and "Lideranca" in rows:
+            marca |= rows["Lideranca"]
+        rows = rows[marca]
     return rows
 
 

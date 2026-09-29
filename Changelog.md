@@ -8,8 +8,13 @@
   oficial de cada pessoa vai para a nova coluna `area` de `people_rows`.
 - Nenhum cargo é descartado: 362 ativos em 29/09/2026 (antes 308), igual à régua da validação.
 - **Equipe** ampliada: Vendas UH, Lotes Comerciais e Repasses (pelo cargo, como antes) +
-  Gerência Comercial, Marketing e Relacionamento, Financeiro Comercial, Trade e Lojas,
-  Performance Comercial e Apoio às Vendas (pelo cargo e pela área oficial).
+  Marketing, Relacionamento com Cliente, Financeiro Comercial (com infraestrutura de lojas e manutenção), Trade,
+  Performance Comercial e Apoio às Vendas (pelo cargo e pela área oficial). **Gerência
+  Comercial** é uma opção complementar: gerentes, executivos e diretor de todas as equipes.
+- **Gestor** só com Gerentes e Executivos: sobe a cadeia até achar um; quem responde direto
+  ao diretor fica em "Sem Gerência Imediata".
+- **Concentração da Mão de Obra** em mapa Carto (pydeck, como no Headcount Total), com
+  tooltip de cidade/UF, ativos e desligados no período.
 - **Cargo**: cargos novos entram pelo nível do título (Analista → Analistas, Gerente →
   Gerente…); novo grupo Especialistas; título sem nível reconhecível vai para "Outros".
 - Visual sem mudanças.

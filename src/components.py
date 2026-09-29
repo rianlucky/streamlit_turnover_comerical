@@ -40,6 +40,15 @@ def chart_card(fig: go.Figure, title: str, subtitle: str, legend: Iterable[tuple
     st.html(f'<div class="leg">{legend_html}</div></div>')
 
 
+def map_card(deck, title: str, subtitle: str, legend: Iterable[tuple[str, str, float]], key: str) -> None:
+    """Como chart_card, para um mapa pydeck (st.pydeck_chart). `key` muda quando os dados mudam,
+    para o mapa redesenhar ao trocar o filtro."""
+    legend_html = "".join(f'<div class="leg-item"><span class="leg-dot" style="background:{color};opacity:{opacity}"></span>{escape(label)}</div>' for color, label, opacity in legend)
+    st.html(f'<div class="chart-card"><div class="ct">{escape(title)}</div><div class="cd">{escape(subtitle)}</div>')
+    st.pydeck_chart(deck, height=420, key=key)
+    st.html(f'<div class="leg">{legend_html}</div></div>')
+
+
 def card_open(title: str, subtitle: str) -> None:
     """Opening half of a .chart-card, for sections that need custom content between title and chart."""
     st.html(f'<div class="chart-card"><div class="ct">{escape(title)}</div><div class="cd">{escape(subtitle)}</div>')

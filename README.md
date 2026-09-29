@@ -87,7 +87,7 @@ python -m streamlit run app.py
 - **Cidade** (multiseleção, exibida como "Cidade/UF"; vazio = Global/todas).
 - **Cargo** (multiseleção por grupo agregado: Auxiliar, Assistentes, Analistas, Analistas Parcerias, Especialistas, Supervisor, Coordenador, Gerente, Executivos, Outros; vazio = todos). Cargos de vendas/repasses seguem a lista fixa; os demais entram pelo nível do título.
 - **Gestor** (multiseleção; cobertura parcial para desligados — ver `NEXTSTEPS.md`).
-- **Equipe** (Vendas UH / Lotes Comerciais / Repasses pelo cargo de vendas; Gerência Comercial / Marketing e Relacionamento / Financeiro Comercial / Trade e Lojas / Performance Comercial / Apoio às Vendas para as demais áreas da Diretoria Comercial — segmento de negócio, independente da Cidade real do colaborador). A base cobre a Diretoria Comercial inteira pelo mapeamento oficial da Central (desde 29/09/2026).
+- **Equipe** (Vendas UH / Lotes Comerciais / Repasses pelo cargo de vendas; Marketing / Relacionamento com Cliente / Financeiro Comercial (inclui infraestrutura de lojas e manutenção) / Trade / Performance Comercial / Apoio às Vendas para as demais áreas da Diretoria Comercial; **Gerência Comercial** é complementar: reúne gerentes, executivos e diretor de todas as equipes — segmento de negócio, independente da Cidade real do colaborador). A base cobre a Diretoria Comercial inteira pelo mapeamento oficial da Central (desde 29/09/2026).
 - **Período** (calendário único, `st.date_input`). Padrão: últimos 12 meses a partir do último mês com dado na base.
 - **Status** (multiseleção Ativo/Desligado, na tabela; padrão Ativo).
 - Busca por nome, cargo, cidade (**sem acento** — "aracatuba" acha "Araçatuba") ou ID, ordenação por coluna, paginação de 20 em 20 e exportação para Excel.
