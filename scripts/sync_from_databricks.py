@@ -73,7 +73,8 @@ SELECT
   COALESCE(rb1.descricao_cargo, rb2.descricao_cargo, rb3.descricao_cargo, rb4.descricao_cargo, rb5.descricao_cargo) AS `Cargo Gestor`,
   'Ativo' AS Status,
   NULL AS `Tipo Desligamento`,
-  f.descricao_posicao AS Posicao
+  f.descricao_posicao AS Posicao,
+  f.descricao_local AS DescLocal
 FROM rh.gold.fato_funcionario_ativo f
 LEFT JOIN enterprise.data.dim_local l ON f.descricao_local = l.descricao_local
 LEFT JOIN reportes_breno rb1 ON f.id_funcionario = rb1.id_funcionario
@@ -104,7 +105,8 @@ SELECT
   d.descricao_reporta_se AS `Cargo Gestor`,
   'Ativo',
   NULL AS `Tipo Desligamento`,
-  f.descricao_posicao
+  f.descricao_posicao,
+  f.descricao_local
 FROM rh.gold.fato_funcionario_inativo f
 LEFT JOIN enterprise.data.dim_local l ON f.descricao_local = l.descricao_local
 LEFT JOIN rh.silver.oracle_hcm_pit_adm_00003_desligados_relatorio d
@@ -139,7 +141,8 @@ SELECT
       ELSE f.acao
     END
   ) AS `Tipo Desligamento`,
-  f.descricao_posicao
+  f.descricao_posicao,
+  f.descricao_local
 FROM rh.gold.fato_funcionario_inativo f
 LEFT JOIN enterprise.data.dim_local l ON f.descricao_local = l.descricao_local
 LEFT JOIN rh.silver.oracle_hcm_pit_adm_00003_desligados_relatorio d
@@ -185,6 +188,18 @@ def _mapeamento_oficial() -> tuple[dict, dict]:
     return cc_map, especiais
 
 
+def _cidades_da_central() -> dict[str, str]:
+    """descricao_local -> cidade em CAIXA ALTA sem acento (mesmo formato do dim_local do
+    Databricks), a partir de core.local_cidade (tabela de locais da Central, completada com o
+    IBGE). Cobre lojas novas que o enterprise.data.dim_local ainda não tem."""
+    import unicodedata
+    def bruto(c: str) -> str:
+        return "".join(ch for ch in unicodedata.normalize("NFKD", c) if not unicodedata.combining(ch)).upper()
+    with engine().connect() as conn:
+        return {d: bruto(c) for d, c in conn.exec_driver_sql(
+            "SELECT descricao_local, cidade FROM core.local_cidade WHERE cidade IS NOT NULL AND cidade <> ''")}
+
+
 def _resolver(cc, posicao, registro, cc_map: dict, especiais: dict) -> tuple[str | None, str | None]:
     """Diretoria/área pelo mapeamento oficial: regra por pessoa, por cargo da posição, depois o CC."""
     cc = None if cc is None or pd.isna(cc) else str(int(float(cc))) if str(cc).replace(".", "").isdigit() else str(cc).strip()
@@ -227,6 +242,13 @@ def fetch_from_databricks() -> pd.DataFrame:
     # repasses, marketing, financeiro comercial, performance... — e sai quem a gold marcava
     # como comercial mas o mapeamento põe em outra diretoria. A área vai para a coluna `area`.
     res = [_resolver(c, p, r, cc_map, especiais) for c, p, r in zip(df["CodDepartamento"], df["Posicao"], df["Registro"])]
+    # cidade: dim_local do Databricks; se vier vazia (loja nova), a tabela de locais da Central
+    sem_cidade = df["Cidade"].isna() | (df["Cidade"].astype(str).str.strip() == "")
+    if sem_cidade.any():
+        central = _cidades_da_central()
+        df.loc[sem_cidade, "Cidade"] = df.loc[sem_cidade, "DescLocal"].map(central)
+        print(f"Cidade completada pela tabela de locais da Central: {int(df.loc[sem_cidade, 'Cidade'].notna().sum())} "
+              f"de {int(sem_cidade.sum())} linha(s) sem cidade no Databricks.")
     df["Diretoria"] = [d for d, _ in res]
     df["Area"] = [a for _, a in res]
     antes = len(df)
