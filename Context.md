@@ -4,7 +4,7 @@
 
 | O quê | Onde | Quem escreve | Quem lê |
 |---|---|---|---|
-| Base de colaboradores (ativos + desligados) | `turnover.people_rows` | `scripts/sync_from_databricks.py` / `load_people_data.py` (`etl_loader`, via `[etl]` do secrets.toml local) | `src/data_logic.py` (`app_turnover`) |
+| Base de colaboradores (ativos + desligados) | `turnover.people_rows` | `scripts/sync_from_databricks.py` / `load_people_data.py` (usuário de carga, via `[etl]` do secrets.toml local) | `src/data_logic.py` (usuário do painel) |
 | "Dados atualizados em" | `turnover.sync_meta` (trigger `turnover.touch_sync_meta`) | automático a cada carga | barra lateral |
 | Login | `public.app_users` | `_neon/acessos/admin_acessos.py` (ferramenta local) | `src/auth.py` |
 

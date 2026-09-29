@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0] - 2026-09-29
+
+**Diretoria Comercial inteira** (antes: só cargos de vendas e repasses)
+- O sync recorta a base pelo **mapeamento oficial da Central** (`core.mapeamento_diretoria`
+  + `_especial`, o mesmo de todos os painéis), não mais pelo `nome_diretoria` da gold. A área
+  oficial de cada pessoa vai para a nova coluna `area` de `people_rows`.
+- Nenhum cargo é descartado: 362 ativos em 29/09/2026 (antes 308), igual à régua da validação.
+- **Equipe** ampliada: Vendas UH, Lotes Comerciais e Repasses (pelo cargo, como antes) +
+  Gerência Comercial, Marketing e Relacionamento, Financeiro Comercial, Trade e Lojas,
+  Performance Comercial e Apoio às Vendas (pelo cargo e pela área oficial).
+- **Cargo**: cargos novos entram pelo nível do título (Analista → Analistas, Gerente →
+  Gerente…); novo grupo Especialistas; título sem nível reconhecível vai para "Outros".
+- Visual sem mudanças.
+
 ## [1.1.0] - 2026-09-25
 
 **Integração à Central de Gente & Dados no Neon — migração 005** (ver
@@ -8,9 +22,9 @@
 - `people_rows` e `sync_meta` saem de `public` para o schema **`turnover`**
   (nomes antigos ficam como views de compatibilidade). O trigger que atualiza
   "Dados atualizados em" foi recriado em `turnover`, com nomes qualificados.
-- Painel conecta como **`app_turnover`** (só leitura). Scripts de carga e
+- Painel conecta como **usuário dedicado do painel** (só leitura). Scripts de carga e
   `grant_access.py` usam o novo bloco **`[etl]`** do `secrets.toml` local
-  (usuário `etl_loader`) — `[etl]` nunca vai para os Secrets do Streamlit Cloud.
+  (usuário de carga) — `[etl]` nunca vai para os Secrets do Streamlit Cloud.
 - `auth.py` só cria/ajusta `app_users` se ela não existir (o usuário do app não
   é dono da tabela).
 

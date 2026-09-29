@@ -85,9 +85,9 @@ python -m streamlit run app.py
 ## Filtros e interações
 
 - **Cidade** (multiseleção, exibida como "Cidade/UF"; vazio = Global/todas).
-- **Cargo** (multiseleção por grupo agregado: Auxiliar, Assistentes, Analistas, Analistas Parcerias, Supervisor, Coordenador, Gerente, Executivos; vazio = todos).
+- **Cargo** (multiseleção por grupo agregado: Auxiliar, Assistentes, Analistas, Analistas Parcerias, Especialistas, Supervisor, Coordenador, Gerente, Executivos, Outros; vazio = todos). Cargos de vendas/repasses seguem a lista fixa; os demais entram pelo nível do título.
 - **Gestor** (multiseleção; cobertura parcial para desligados — ver `NEXTSTEPS.md`).
-- **Equipe** (Vendas UH / Lotes Comerciais / Repasses — segmento de negócio, independente da Cidade real do colaborador).
+- **Equipe** (Vendas UH / Lotes Comerciais / Repasses pelo cargo de vendas; Gerência Comercial / Marketing e Relacionamento / Financeiro Comercial / Trade e Lojas / Performance Comercial / Apoio às Vendas para as demais áreas da Diretoria Comercial — segmento de negócio, independente da Cidade real do colaborador). A base cobre a Diretoria Comercial inteira pelo mapeamento oficial da Central (desde 29/09/2026).
 - **Período** (calendário único, `st.date_input`). Padrão: últimos 12 meses a partir do último mês com dado na base.
 - **Status** (multiseleção Ativo/Desligado, na tabela; padrão Ativo).
 - Busca por nome, cargo, cidade (**sem acento** — "aracatuba" acha "Araçatuba") ou ID, ordenação por coluna, paginação de 20 em 20 e exportação para Excel.
@@ -95,6 +95,6 @@ python -m streamlit run app.py
 - Indicador complementar: Permanência Média (Ativos × Desligados), com barra comparativa.
 - Página **Ranking**: Top 5 de turnover médio e de total de desligamentos, por Cidade, Cargo e Gestor.
 - Página **Comparativo Turnover**: compara a fórmula de turnover do Comercial (efetivo médio do mês) com a do D.O. (efetivo do fechamento do mês anterior).
-- Barra lateral: data da última sincronização da base e contadores de cargo/cidade fora do mapeamento (texto cinza, embaixo da navegação).
+- Barra lateral: data da última sincronização da base e contadores de cargo sem nível (grupo Outros) e de cidade fora do mapeamento (texto cinza, embaixo da navegação).
 
 O turnover real e o indicador legado seguem as fórmulas do painel original que este dashboard substituiu — ver `Context.md` (decisões e histórico) e `NEXTSTEPS.md` (riscos/limitações em aberto, não versionado).

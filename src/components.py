@@ -113,7 +113,7 @@ def render_sidebar_status() -> None:
     cargos_fora = source_data.get("cargos_nao_mapeados", 0)
     cidades_fora = source_data.get("cidades_nao_mapeadas", 0)
     if cargos_fora:
-        linhas.append(f"{cargos_fora} registro(s) com cargo fora do mapeamento")
+        linhas.append(f"{cargos_fora} registro(s) com cargo sem nível (grupo Outros)")
     if cidades_fora:
         linhas.append(f"{cidades_fora} registro(s) com cidade fora do mapeamento")
 

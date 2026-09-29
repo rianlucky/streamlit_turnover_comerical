@@ -156,10 +156,10 @@ def _normalize_cargo(cargo: str) -> str:
     return _CARGO_ALIASES.get(cargo, cargo)
 
 
-# Cargo (já normalizado por _normalize_cargo) -> grupo de filtro. Única lista de
-# cargos que o dash usa — qualquer título fora daqui é descartado em
-# load_source_data() (a query do Databricks é ampla o suficiente pra trazer gente
-# de outras áreas, ex.: Marketing, Financeiro Comercial, RH).
+# Cargo (já normalizado por _normalize_cargo) -> grupo de filtro, para os cargos de vendas e
+# repasses. Desde 29/09/2026 o painel cobre a Diretoria Comercial inteira (recorte pelo
+# mapeamento oficial, no sync): cargo fora desta lista entra pelo nível do título
+# (_grupo_por_nivel) — ex.: "Analista de Marketing" -> "Analistas".
 CARGO_GROUP_MAP = {
     "Executivo Comercial": "Executivos",
     "Executivo de Repasses": "Executivos",
@@ -181,10 +181,51 @@ CARGO_GROUP_MAP = {
     "Auxiliar de Vendas": "Auxiliar",
     "Auxiliar de Repasses": "Auxiliar",
 }
-CARGO_GROUP_ORDER = ["Auxiliar", "Assistentes", "Analistas", "Analistas Parcerias", "Supervisor", "Coordenador", "Gerente", "Executivos"]
+CARGO_GROUP_ORDER = ["Auxiliar", "Assistentes", "Analistas", "Analistas Parcerias", "Especialistas", "Supervisor",
+                     "Coordenador", "Gerente", "Executivos", "Outros"]
 
-# Equipe: segmento de negócio (separado de Cidade/Grupo) — ver load_source_data().
-EQUIPE_ORDER = ["Vendas UH", "Lotes Comerciais", "Repasses"]
+# Primeira palavra do título -> grupo, para cargos fora do CARGO_GROUP_MAP.
+_NIVEL_POR_PREFIXO = {
+    "Auxiliar": "Auxiliar", "Assistente": "Assistentes", "Analista": "Analistas", "Especialista": "Especialistas",
+    "Supervisor": "Supervisor", "Supervisora": "Supervisor", "Coordenador": "Coordenador", "Coordenadora": "Coordenador",
+    "Gerente": "Gerente", "Executivo": "Executivos", "Executiva": "Executivos",
+}
+
+
+def _grupo_por_nivel(cargo: str) -> str:
+    return CARGO_GROUP_MAP.get(cargo) or _NIVEL_POR_PREFIXO.get(cargo.split(" ", 1)[0], "Outros")
+
+
+# Equipe: segmento de negócio (separado de Cidade/Grupo) — ver load_source_data(). As três
+# primeiras vêm do cargo de vendas; as demais, das outras áreas da Diretoria Comercial.
+EQUIPE_ORDER = ["Vendas UH", "Lotes Comerciais", "Repasses", "Gerência Comercial", "Marketing e Relacionamento",
+                "Financeiro Comercial", "Trade e Lojas", "Performance Comercial", "Apoio às Vendas"]
+
+# Área oficial (mapeamento da Central) -> Equipe, para quem não é cargo de vendas/repasses.
+# As áreas "Vendas (região)" juntam os CCs das lojas: quem está lá sem cargo de vendas e sem
+# palavra-chave abaixo (ex.: motorista, manutenção) fica em "Apoio às Vendas".
+_EQUIPE_POR_AREA = {
+    "Marketing, Comunicação Interna e Relacionamento com Cliente": "Marketing e Relacionamento",
+    "Financeiro Comercial": "Financeiro Comercial", "Performance Comercial": "Performance Comercial",
+    "Gerência Comercial": "Gerência Comercial", "Repasses": "Repasses", "Lotes Comerciais": "Lotes Comerciais",
+}
+# Palavra no cargo -> Equipe (vale antes da área: o financeiro comercial e o trade ficam nos CCs das lojas)
+_EQUIPE_POR_CARGO = [
+    ("financeiro comercial", "Financeiro Comercial"),
+    ("marketing", "Marketing e Relacionamento"), ("comunicação", "Marketing e Relacionamento"),
+    ("relacionamento", "Marketing e Relacionamento"), ("áudio visual", "Marketing e Relacionamento"),
+    ("trade", "Trade e Lojas"), ("infraestrutura de lojas", "Trade e Lojas"),
+    ("performance", "Performance Comercial"), ("estratégico", "Performance Comercial"),
+    ("inteligência de dados", "Performance Comercial"),
+]
+
+
+def _equipe_outras_areas(cargo: str, area: str | None) -> str:
+    c = cargo.lower()
+    for chave, equipe in _EQUIPE_POR_CARGO:
+        if chave in c:
+            return equipe
+    return _EQUIPE_POR_AREA.get(area or "", "Apoio às Vendas")
 
 
 def _extract_json(source: str, declaration: str, next_declaration: str) -> Any:
@@ -208,7 +249,8 @@ SELECT
     status AS "Status",
     gestor AS "Gestor",
     tipo_desligamento AS "Tipo Desligamento",
-    setor AS "Setor"
+    setor AS "Setor",
+    area AS "Area"
 FROM turnover.people_rows
 """
 
@@ -267,10 +309,10 @@ def load_source_data() -> dict[str, Any]:
     rows = conn.query(PEOPLE_ROWS_QUERY, ttl=600)
     rows = rows[(rows["Demissão"] == "") | (rows["Demissão"] > _termination_cutoff())].copy()
     rows["Cargo Atual2"] = rows["Cargo Atual2"].map(_normalize_cargo)
-    total_antes_cargo = len(rows)
-    rows = rows[rows["Cargo Atual2"].isin(CARGO_GROUP_MAP)].copy()
-    cargos_nao_mapeados = total_antes_cargo - len(rows)
-    rows["Grupo"] = rows["Cargo Atual2"].map(CARGO_GROUP_MAP)
+    # Diretoria Comercial inteira (o sync já recorta pelo mapeamento oficial): nenhum cargo é
+    # descartado; "Outros" sinaliza título sem nível reconhecível (aparece no rodapé da barra).
+    rows["Grupo"] = rows["Cargo Atual2"].map(_grupo_por_nivel)
+    cargos_nao_mapeados = int((rows["Grupo"] == "Outros").sum())
 
     # Databricks devolve a cidade em CAIXA ALTA sem acento — normaliza pro nome
     # "bonito" (usado em CITY_UF/CITY_COORDS e exibido na tela). Cidade sempre é o
@@ -286,6 +328,9 @@ def load_source_data() -> dict[str, Any]:
     rows["Equipe"] = "Vendas UH"
     rows.loc[rows["Cargo Atual2"].str.contains("Lotes"), "Equipe"] = "Lotes Comerciais"
     rows.loc[rows["Cargo Atual2"].str.contains("Repasses"), "Equipe"] = "Repasses"
+    # Demais áreas da Diretoria Comercial (29/09/2026): cargo fora dos de vendas/repasses.
+    outras = ~rows["Cargo Atual2"].isin(CARGO_GROUP_MAP)
+    rows.loc[outras, "Equipe"] = [_equipe_outras_areas(c, a) for c, a in zip(rows.loc[outras, "Cargo Atual2"], rows.loc[outras, "Area"])]
     # A base antiga (HTML) já marcava estes 2 Registros como "Lotes" mesmo com cargo
     # formal de Vendas — mantém a mesma classificação de equipe na base real (Databricks).
     LOTES_REGISTRO_OVERRIDE = {2649, 2505}

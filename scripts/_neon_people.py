@@ -70,6 +70,7 @@ ALTER_TABLE_SQL = [
     "ALTER TABLE turnover.people_rows ADD COLUMN IF NOT EXISTS gestor TEXT",
     "ALTER TABLE turnover.people_rows ADD COLUMN IF NOT EXISTS cargo_gestor TEXT",
     "ALTER TABLE turnover.people_rows ADD COLUMN IF NOT EXISTS tipo_desligamento TEXT",
+    "ALTER TABLE turnover.people_rows ADD COLUMN IF NOT EXISTS area TEXT",
 ]
 
 # DataFrame column (fonte) -> coluna da tabela. Colunas ausentes na origem
@@ -87,6 +88,7 @@ COLUMN_MAP = {
     "Gestor": "gestor",
     "Cargo Gestor": "cargo_gestor",
     "Tipo Desligamento": "tipo_desligamento",
+    "Area": "area",
 }
 
 
@@ -96,12 +98,12 @@ def load_secrets() -> dict:
 
 
 def _etl_url(secrets: dict) -> str:
-    """Escrita = usuário de carga `etl_loader` (migração 005), em [etl] url no
+    """Escrita = usuário de carga (migração 005), em [etl] url no
     secrets.toml local. [connections.sql] agora tem o usuário do painel
-    (app_turnover), que só lê. NÃO colar [etl] nos Secrets do Streamlit Cloud."""
+    (usuário do painel), que só lê. NÃO colar [etl] nos Secrets do Streamlit Cloud."""
     url = (secrets.get("etl") or {}).get("url")
     if not url:
-        raise SystemExit("Falta [etl] url (usuário etl_loader) em .streamlit/secrets.toml")
+        raise SystemExit("Falta [etl] url (usuário de carga) em .streamlit/secrets.toml")
     return url
 
 

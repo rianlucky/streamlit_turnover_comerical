@@ -25,7 +25,9 @@ import pandas as pd
 from databricks import sql
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from _neon_people import SECRETS_PATH, EmptySourceError, load_secrets, replace_people_rows  # noqa: E402
+from _neon_people import SECRETS_PATH, EmptySourceError, engine, load_secrets, replace_people_rows  # noqa: E402
+
+DIRETORIA = "Diretoria Comercial"
 
 # A descrição do departamento sempre termina com essa etiqueta genérica de equipe
 # (ex.: "Uberlândia (Faz. Campo Alegre 1) - Equipe Vendas Comercial") — tirada do
@@ -44,8 +46,9 @@ def _formatar_setor(codigo: object, nome: object) -> str:
     return codigo or nome
 
 
-def _query(ref_str: str, gestor_referencia: str) -> str:
+def _query(ref_str: str, gestor_referencia: str, ccs: list[int]) -> str:
     gestor_sql = gestor_referencia.replace("'", "''")
+    ccs_sql = ", ".join(str(int(c)) for c in ccs) or "NULL"
     return f"""
 WITH reportes_breno AS (
   SELECT id_funcionario, nome_funcionario, descricao_cargo
@@ -69,7 +72,8 @@ SELECT
   COALESCE(rb1.nome_funcionario, rb2.nome_funcionario, rb3.nome_funcionario, rb4.nome_funcionario, rb5.nome_funcionario) AS Gestor,
   COALESCE(rb1.descricao_cargo, rb2.descricao_cargo, rb3.descricao_cargo, rb4.descricao_cargo, rb5.descricao_cargo) AS `Cargo Gestor`,
   'Ativo' AS Status,
-  NULL AS `Tipo Desligamento`
+  NULL AS `Tipo Desligamento`,
+  f.descricao_posicao AS Posicao
 FROM rh.gold.fato_funcionario_ativo f
 LEFT JOIN enterprise.data.dim_local l ON f.descricao_local = l.descricao_local
 LEFT JOIN reportes_breno rb1 ON f.id_funcionario = rb1.id_funcionario
@@ -81,6 +85,7 @@ LEFT JOIN reportes_breno rb4 ON h3.id_gestor = rb4.id_funcionario
 LEFT JOIN hierarquia h4 ON h3.id_gestor = h4.id_funcionario
 LEFT JOIN reportes_breno rb5 ON h4.id_gestor = rb5.id_funcionario
 WHERE (f.nome_diretoria = 'Diretoria Comercial'
+       OR TRY_CAST(f.departamento AS BIGINT) IN ({ccs_sql})
        OR (f.nome_diretoria IS NULL
            AND (LOWER(f.descricao_departamento) LIKE '%vendas comercial%'
                 OR LOWER(f.descricao_departamento) LIKE '%equipe vendas%'
@@ -98,13 +103,15 @@ SELECT
   d.nome_gestor AS Gestor,
   d.descricao_reporta_se AS `Cargo Gestor`,
   'Ativo',
-  NULL AS `Tipo Desligamento`
+  NULL AS `Tipo Desligamento`,
+  f.descricao_posicao
 FROM rh.gold.fato_funcionario_inativo f
 LEFT JOIN enterprise.data.dim_local l ON f.descricao_local = l.descricao_local
 LEFT JOIN rh.silver.oracle_hcm_pit_adm_00003_desligados_relatorio d
   ON f.id_funcionario = d.numero_pessoa
   AND f.data_desligamento = d.data_desligamento
 WHERE (f.nome_diretoria = 'Diretoria Comercial'
+       OR TRY_CAST(f.departamento AS BIGINT) IN ({ccs_sql})
        OR (f.nome_diretoria IS NULL
            AND (LOWER(f.descricao_departamento) LIKE '%vendas comercial%'
                 OR LOWER(f.descricao_departamento) LIKE '%equipe vendas%'
@@ -131,13 +138,15 @@ SELECT
       WHEN f.acao = 'Transferência Global' THEN 'Transferência'
       ELSE f.acao
     END
-  ) AS `Tipo Desligamento`
+  ) AS `Tipo Desligamento`,
+  f.descricao_posicao
 FROM rh.gold.fato_funcionario_inativo f
 LEFT JOIN enterprise.data.dim_local l ON f.descricao_local = l.descricao_local
 LEFT JOIN rh.silver.oracle_hcm_pit_adm_00003_desligados_relatorio d
   ON f.id_funcionario = d.numero_pessoa
   AND f.data_desligamento = d.data_desligamento
 WHERE (f.nome_diretoria = 'Diretoria Comercial'
+       OR TRY_CAST(f.departamento AS BIGINT) IN ({ccs_sql})
        OR (f.nome_diretoria IS NULL
            AND (LOWER(f.descricao_departamento) LIKE '%vendas comercial%'
                 OR LOWER(f.descricao_departamento) LIKE '%equipe vendas%'
@@ -163,6 +172,32 @@ def _ref_date_from_args() -> date:
     return date.today().replace(day=1) - timedelta(days=1)
 
 
+def _mapeamento_oficial() -> tuple[dict, dict]:
+    """Mapeamento oficial da Central (core.mapeamento_diretoria + _especial, planilha
+    _neon/mapeamento/Mapeamento Diretoria.xlsx) — o mesmo de todos os painéis."""
+    with engine().connect() as conn:
+        cc_map = {str(cc): (d, a) for cc, d, a in conn.exec_driver_sql(
+            "SELECT centro_de_custo, diretoria, area FROM core.mapeamento_diretoria")}
+        especiais: dict = {}
+        for cc, tipo, chave, d, a in conn.exec_driver_sql(
+                "SELECT centro_de_custo, tipo, chave, diretoria, area FROM core.mapeamento_diretoria_especial"):
+            especiais.setdefault(str(cc), {})[(tipo, str(chave))] = (d, a)
+    return cc_map, especiais
+
+
+def _resolver(cc, posicao, registro, cc_map: dict, especiais: dict) -> tuple[str | None, str | None]:
+    """Diretoria/área pelo mapeamento oficial: regra por pessoa, por cargo da posição, depois o CC."""
+    cc = None if cc is None or pd.isna(cc) else str(int(float(cc))) if str(cc).replace(".", "").isdigit() else str(cc).strip()
+    esp = especiais.get(cc, {}) if cc else {}
+    r = esp.get(("by_person", str(registro)))
+    if r is None:
+        pos = posicao if isinstance(posicao, str) else ""
+        r = esp.get(("by_position", pos.rsplit(" - ", 1)[0].strip()))
+    if r is None and cc:
+        r = cc_map.get(cc)
+    return r if r else (None, None)
+
+
 def fetch_from_databricks() -> pd.DataFrame:
     cfg = load_secrets()["databricks"]
     gestor_referencia = cfg.get("gestor_referencia", "").strip()
@@ -171,6 +206,9 @@ def fetch_from_databricks() -> pd.DataFrame:
         sys.exit(1)
 
     ref_str = _ref_date_from_args().strftime("%Y-%m-%d")
+    cc_map, especiais = _mapeamento_oficial()
+    ccs = sorted({int(cc) for cc, (d, _) in cc_map.items() if d == DIRETORIA and cc.isdigit()}
+                 | {int(cc) for cc, regras in especiais.items() if cc.isdigit() and any(d == DIRETORIA for d, _ in regras.values())})
 
     print(f"Conectando ao Databricks via OAuth (o navegador deve abrir para login)... referência: {ref_str}")
     connection = sql.connect(
@@ -180,10 +218,22 @@ def fetch_from_databricks() -> pd.DataFrame:
     )
     with connection:
         with connection.cursor() as cursor:
-            cursor.execute(_query(ref_str, gestor_referencia))
+            cursor.execute(_query(ref_str, gestor_referencia, ccs))
             columns = [desc[0] for desc in cursor.description]
             rows = cursor.fetchall()
-    return pd.DataFrame(rows, columns=columns)
+    df = pd.DataFrame(rows, columns=columns)
+
+    # Recorte pelo mapeamento oficial (29/09/2026): entra toda a Diretoria Comercial — vendas,
+    # repasses, marketing, financeiro comercial, performance... — e sai quem a gold marcava
+    # como comercial mas o mapeamento põe em outra diretoria. A área vai para a coluna `area`.
+    res = [_resolver(c, p, r, cc_map, especiais) for c, p, r in zip(df["CodDepartamento"], df["Posicao"], df["Registro"])]
+    df["Diretoria"] = [d for d, _ in res]
+    df["Area"] = [a for _, a in res]
+    antes = len(df)
+    df = df[df["Diretoria"] == DIRETORIA].copy()
+    print(f"Mapeamento oficial: {len(df)} de {antes} linha(s) na {DIRETORIA} "
+          f"({antes - len(df)} de outras diretorias ou sem mapeamento ficaram de fora).")
+    return df
 
 
 def main() -> None:
